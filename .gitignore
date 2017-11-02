@@ -1,0 +1,24 @@
+.local/
+/bmacs.el
+
+# emacs tempfiles that shouldn't be there
+.mc-lists.el
+.org-id-locations
+.tern-port
+auto-save-list
+semanticdb
+ede-projects.el
+tramp
+smex-items
+network-security.data
+
+# compiled files
+*.elc
+*.lib
+*.fas
+*.dat
+*.eld
+
+# transient files
+*.cache-*
+*.log
