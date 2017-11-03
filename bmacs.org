@@ -7,11 +7,6 @@
 * Configuration
 
 ** About this file
-   :PROPERTIES:
-   :CUSTOM_ID: babel-init
-   :END:
-<<babel-init>>
-
 This is Bryan Gilbert's personal Emacs configuration.
 
 ** Personal Information
@@ -74,23 +69,21 @@ different types of files.
 `bmacs-init-hook'.")
 #+END_SRC
 
-** Emacs Initialization
-
-TODO - Maybe look into adding external elisp folder?
-
-*** Initialization Settings
-
-Let's start emacs up quietly.
+** Security Settings
 
 #+BEGIN_SRC emacs-lisp
-(advice-add #'display-startup-echo-area-message :override #'ignore)
-(setq inhibit-startup-message t
-      inhibit-startup-echo-area-message user-login-name
-      inhibit-default-init t
-      initial-major-mode 'fundamental-mode
-      initial-scratch-message nil
-      mode-line-format nil)
+(setq gnutls-verify-error t
+      tls-checktrust gnutls-verify-error
+      tls-program (list "gnutls-cli --x509cafile %t -p %p %h"
+                        ;; compatibility fallbacks
+                        "gnutls-cli -p %p %h"
+                        "openssl s_client -connect %h:%p -no_ssl2 -no_ssl3 -ign_eof")
+      nsm-settings-file (expand-file-name "network-security.data" bmacs-cache-dir))
 #+END_SRC
+
+** Emacs Initialization
+
+*** Initialization Settings
 
 We're going to increase the gc-cons-threshold to a very high number to decrease the load time. We're
 going to add a hook to reset this value after initialization
@@ -192,17 +185,6 @@ configured =use-package= to always defer a package by default.
    :fetcher github
    :repo "quelpa/quelpa-use-package"))
 (require 'quelpa-use-package)
-#+END_SRC
-
-** Security Settings
-
-#+BEGIN_SRC emacs-lisp
-(setq gnutls-verify-error t
-      tls-checktrust gnutls-verify-error
-      tls-program (list "gnutls-cli --x509cafile %t -p %p %h"
-                        ;; compatibility fallbacks
-                        "gnutls-cli -p %p %h"
-                        "openssl s_client -connect %h:%p -no_ssl2 -no_ssl3 -ign_eof"))
 #+END_SRC
 
 ** Macros
@@ -1060,7 +1042,7 @@ They power and the glory! Generic complete anything frontend
   ;; Show more buffer information in switch-buffer commands
   (ivy-set-display-transformer #'ivy-switch-buffer #'+ivy-buffer-transformer)
   (ivy-set-display-transformer #'ivy-switch-buffer-other-window #'+ivy-buffer-transformer)
-  (ivy-set-display-transformer #'+ivy/switch-workspace-buffer #'+ivy-buffer-transformer)
+  (ivy-set-display-transformer #'counsel-projectile-switch-to-buffer #'+ivy-buffer-transformer)
   (ivy-set-display-transformer #'counsel-recentf #'abbreviate-file-name)
 
   ;; Don't sort perp mode related lists
@@ -3581,8 +3563,8 @@ Functions
 
 #+BEGIN_SRC emacs-lisp
 
-(use-package org-plus-contrib
-  :quelpa (org-plus-contrib :fetcher git :repo "http://orgmode.org/org-mode.git"))
+(use-package org
+  :quelpa (org :fetcher git :repo "http://orgmode.org/org-mode.git"))
 
 ;; Ensure ELPA org is prioritized above built-in org.
 (when-let* ((path (locate-library "org" nil load-path)))
@@ -4059,15 +4041,7 @@ between the two."
     (when (derived-mode-p 'org-mode)
       (org-remove-occur-highlights)
       t))
-  (add-hook '+evil-esc-hook #'+borg|remove-occur-highlights)
-
-  (after! recentf
-    ;; Don't clobber recentf with agenda files
-    (defun +borg-is-agenda-file (filename)
-      (cl-find (file-truename filename) org-agenda-files
-               :key #'file-truename
-               :test #'equal))
-    (add-to-list 'recentf-exclude #'+borg-is-agenda-file)))
+  (add-hook '+evil-esc-hook #'+borg|remove-occur-highlights))
 
 (+borg|init)
 ;(add-hook 'org-load-hook #'+borg|init)
@@ -6573,28 +6547,23 @@ Improved help commands
             (message file-name))
         (error "Buffer not visiting a file"))))
 
-  ;; (defun bmacs/alternate-buffer (&optional window)
-  ;;   "Switch back and forth between current and last buffer in the
-  ;; current window."
-  ;;   (interactive)
-  ;;   (let ((current-buffer (window-buffer window))
-  ;;         (buffer-predicate
-  ;;          (frame-parameter (window-frame window) 'buffer-predicate)))
-  ;;     ;; switch to first buffer previously shown in this window that matches
-  ;;     ;; frame-parameter `buffer-predicate'
-  ;;     (switch-to-buffer
-  ;;      (or (cl-find-if (lambda (buffer)
-  ;;                        (and (not (eq buffer current-buffer))
-  ;;                             (or (null buffer-predicate)
-  ;;                                 (funcall buffer-predicate buffer))))
-  ;;                      (mapcar #'car (window-prev-buffers window)))
-  ;;          ;; `other-buffer' honors `buffer-predicate' so no need to filter
-  ;;          (other-buffer current-buffer t)))))
-
-  ;; TODO: make better ... not window specific
-  (defun bmacs/alternate-buffer ()
+  (defun bmacs/alternate-buffer (&optional window)
+    "Switch back and forth between current and last buffer in the
+  current window."
     (interactive)
-    (switch-to-buffer (other-buffer (current-buffer) 1)))
+    (let ((current-buffer (window-buffer window))
+          (buffer-predicate
+           (frame-parameter (window-frame window) 'buffer-predicate)))
+      ;; switch to first buffer previously shown in this window that matches
+      ;; frame-parameter `buffer-predicate'
+      (switch-to-buffer
+       (or (cl-find-if (lambda (buffer)
+                         (and (not (eq buffer current-buffer))
+                              (or (null buffer-predicate)
+                                  (funcall buffer-predicate buffer))))
+                       (mapcar #'car (window-prev-buffers window)))
+           ;; `other-buffer' honors `buffer-predicate' so no need to filter
+           (other-buffer current-buffer t)))))
 
   (defun bmacs/toggle-fold ()
     (interactive)
@@ -6829,7 +6798,7 @@ session)."
     (:desc "buffer"
       :prefix "b"
       :desc "Select entire buffer"           :nv "a" #'mark-whole-buffer
-      :desc "Switch workspace buffer"        :nv "b" #'projectile-switch-to-buffer
+      :desc "Switch workspace buffer"        :nv "b" #'counsel-projectile-switch-to-buffer
       :desc "Switch buffer"                  :nv "B" #'ivy-switch-buffer
       :desc "Kill buffer"                    :nv "d" #'kill-this-buffer
       :desc "Kill other buffers"             :nv "D" (lambda ()
@@ -6927,7 +6896,7 @@ session)."
       :desc "Organizer"                    :nv "o" #'+borg/open-organizer
       :desc "Agenda"                       :nv "a" #'org-agenda
       :desc "Org capture"                  :nv "c" #'org-capture
-      :desc "Email"                        :nv "e" #'=email)
+      :desc "Email"                        :nv "e" #'mu4e)
 
     (:desc "quit"
      :prefix "q"
