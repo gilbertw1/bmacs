@@ -32,32 +32,33 @@ We're going to define a number of directories that are used throughout this conf
 different types of files.
 
 #+BEGIN_SRC emacs-lisp
-(defvar bmacs-emacs-dir (expand-file-name user-emacs-directory)
-  "The path to the emacs.d directory.")
+(eval-and-compile
+  (defvar bmacs-emacs-dir (expand-file-name user-emacs-directory)
+    "The path to the emacs.d directory.")
 
-(defvar bmacs-local-dir (concat bmacs-emacs-dir ".local/")
-  "Root directory for local Emacs files. Use this as permanent storage for files
-that are safe to share across systems (if this config is symlinked across
-several computers).")
+  (defvar bmacs-local-dir (concat bmacs-emacs-dir ".local/")
+    "Root directory for local Emacs files. Use this as permanent storage for files
+  that are safe to share across systems (if this config is symlinked across
+  several computers).")
 
-(defvar bmacs-host-dir (concat bmacs-local-dir "@" (system-name))
-  "Directory for hostname-specific file storage. Used by `bmacs-etc-dir' and
-`bmacs-cache-dir'.")
+  (defvar bmacs-host-dir (concat bmacs-local-dir "@" (system-name))
+    "Directory for hostname-specific file storage. Used by `bmacs-etc-dir' and
+  `bmacs-cache-dir'.")
 
-(defvar bmacs-etc-dir (concat bmacs-host-dir "/etc/")
-  "Host-namespaced directory for non-volatile storage. These are not deleted or
-tampored with by BMACS functions. Use this for dependencies like servers or
-config files that are stable (i.e. it should be unlikely that you need to delete
-them if something goes wrong).")
+  (defvar bmacs-etc-dir (concat bmacs-host-dir "/etc/")
+    "Host-namespaced directory for non-volatile storage. These are not deleted or
+  tampored with by BMACS functions. Use this for dependencies like servers or
+  config files that are stable (i.e. it should be unlikely that you need to delete
+  them if something goes wrong).")
 
-(defvar bmacs-cache-dir (concat bmacs-host-dir "/cache/")
-  "Host-namespaced directory for volatile storage. Deleted when `bmacs/reset' is
-called. Use this for transient files that are generated on the fly like caches
-and temporary files. Anything that may need to be cleared if there are
-problems.")
+  (defvar bmacs-cache-dir (concat bmacs-host-dir "/cache/")
+    "Host-namespaced directory for volatile storage. Deleted when `bmacs/reset' is
+  called. Use this for transient files that are generated on the fly like caches
+  and temporary files. Anything that may need to be cleared if there are
+  problems.")
 
-(defvar bmacs-packages-dir (concat bmacs-local-dir "packages/")
-  "Where package.el and quelpa plugins (and their caches) are stored.")
+  (defvar bmacs-packages-dir (concat bmacs-local-dir "packages/")
+    "Where package.el and quelpa plugins (and their caches) are stored."))
 
 
 (dolist (dir (list bmacs-local-dir bmacs-etc-dir bmacs-cache-dir (expand-file-name "elpa" bmacs-packages-dir)))
@@ -95,8 +96,9 @@ We're going to increase the gc-cons-threshold to a very high number to decrease 
 going to add a hook to reset this value after initialization
 
 #+BEGIN_SRC emacs-lisp
-(setq gc-cons-threshold 402653184
-      gc-cons-percentage 0.6)
+(eval-and-compile
+  (setq gc-cons-threshold 402653184
+        gc-cons-percentage 0.6))
 
 (add-hook 'bmacs-post-init-hook #'(lambda () (setq gc-cons-threshold 16777216
                                                    gc-cons-percentage 0.1)))
@@ -115,6 +117,14 @@ Now, we're going to disable double-buffering to prevent stuttering.
 (add-to-list 'default-frame-alist '(inhibit-double-buffering . t))
 #+END_SRC
 
+We want to store any custom set variables in a separate =custom.el= file to prevent custom variables
+from being written to our =init.el= file.
+
+#+BEGIN_SRC emacs-lisp
+(setq custom-file "~/.emacs.d/custom.el")
+(load custom-file)
+#+END_SRC
+
 *** Initialize and Add Package Sources
 
 #+BEGIN_SRC emacs-lisp
@@ -129,9 +139,11 @@ Now, we're going to disable double-buffering to prevent stuttering.
       quelpa-melpa-recipe-stores nil
       quelpa-self-upgrade-p nil)
 
+(eval-and-compile
+  (setq package-user-dir (expand-file-name "elpa" bmacs-packages-dir)))
+
 (setq load-prefer-newer t
-      package-enable-at-startup nil
-      package-user-dir (expand-file-name "elpa" bmacs-packages-dir))
+      package-enable-at-startup nil)
 
 (setq quelpa-dir (expand-file-name "quelpa" bmacs-packages-dir))
 
@@ -139,7 +151,8 @@ Now, we're going to disable double-buffering to prevent stuttering.
   (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/") t))
 (unless (assoc-default "org" package-archives)
   (add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t))
-(package-initialize)
+(eval-and-compile
+  (package-initialize))
 (add-to-list 'load-path "/usr/local/share/emacs/site-lisp/mu/mu4e")
 #+END_SRC
 
@@ -214,55 +227,52 @@ compilation."
 An amazing keybinding macro written by hlissner
 
 #+BEGIN_SRC emacs-lisp
-(defun bmacs-enlist (exp)
-  "Return EXP wrapped in a list, or as-is if already a list."
-  (if (listp exp) exp (list exp)))
+(eval-and-compile
+  (defun bmacs-enlist (exp)
+    "Return EXP wrapped in a list, or as-is if already a list."
+    (if (listp exp) exp (list exp)))
 
-(defun doom-unquote (exp)
-  "Return EXP unquoted."
-  (while (memq (car-safe exp) '(quote function))
-    (setq exp (cadr exp)))
-  exp)
+  (defun doom-unquote (exp)
+    "Return EXP unquoted."
+    (while (memq (car-safe exp) '(quote function))
+      (setq exp (cadr exp)))
+    exp)
 
-(defvar bmacs-leader-key "SPC"
-  "The leader prefix key, for global commands.")
+  (defvar bmacs-leader-key "SPC"
+    "The leader prefix key, for global commands.")
 
-(defvar bmacs-localleader-key "SPC m"
-  "The localleader prefix key, for major-mode specific commands.")
+  (defvar bmacs-localleader-key "SPC m"
+    "The localleader prefix key, for major-mode specific commands.")
 
-(defvar bmacs-evil-state-alist
-  '((?n . normal)
-    (?v . visual)
-    (?i . insert)
-    (?e . emacs)
-    (?o . operator)
-    (?m . motion)
-    (?r . replace))
-  "A list of cons cells that map a letter to a evil state symbol.")
+  (defvar bmacs-evil-state-alist
+    '((?n . normal)
+      (?v . visual)
+      (?i . insert)
+      (?e . emacs)
+      (?o . operator)
+      (?m . motion)
+      (?r . replace))
+    "A list of cons cells that map a letter to a evil state symbol.")
 
-;; Register keywords for proper indentation (see `map!')
-(put ':after        'lisp-indent-function 'defun)
-(put ':desc         'lisp-indent-function 'defun)
-(put ':leader       'lisp-indent-function 'defun)
-(put ':local        'lisp-indent-function 'defun)
-(put ':localleader  'lisp-indent-function 'defun)
-(put ':map          'lisp-indent-function 'defun)
-(put ':map*         'lisp-indent-function 'defun)
-(put ':mode         'lisp-indent-function 'defun)
-(put ':prefix       'lisp-indent-function 'defun)
-(put ':textobj      'lisp-indent-function 'defun)
-(put ':unless       'lisp-indent-function 'defun)
-(put ':when         'lisp-indent-function 'defun)
+  ;; Register keywords for proper indentation (see `map!')
+  (put ':after        'lisp-indent-function 'defun)
+  (put ':desc         'lisp-indent-function 'defun)
+  (put ':leader       'lisp-indent-function 'defun)
+  (put ':local        'lisp-indent-function 'defun)
+  (put ':localleader  'lisp-indent-function 'defun)
+  (put ':map          'lisp-indent-function 'defun)
+  (put ':map*         'lisp-indent-function 'defun)
+  (put ':mode         'lisp-indent-function 'defun)
+  (put ':prefix       'lisp-indent-function 'defun)
+  (put ':textobj      'lisp-indent-function 'defun)
+  (put ':unless       'lisp-indent-function 'defun)
+  (put ':when         'lisp-indent-function 'defun)
 
 ;; specials
-(defvar bmacs--keymaps nil)
-(defvar bmacs--prefix  nil)
-(defvar bmacs--defer   nil)
-(defvar bmacs--local   nil)
-
-(defun bmacs-enlist (exp)
-  "Return EXP wrapped in a list, or as-is if already a list."
-  (if (listp exp) exp (list exp)))
+  (defvar bmacs--keymaps nil)
+  (defvar bmacs--prefix  nil)
+  (defvar bmacs--defer   nil)
+  (defvar bmacs--local   nil)
 
 (defun bmacs--keybind-register (key desc &optional modes)
   "Register a description for KEY with `which-key' in MODES.
@@ -274,7 +284,6 @@ An amazing keybinding macro written by hlissner
       (dolist (mode modes)
         (which-key-add-major-mode-key-based-replacements mode key desc))
     (which-key-add-key-based-replacements key desc)))
-
 
 (defun bmacs--keyword-to-states (keyword)
   "Convert a KEYWORD into a list of evil state symbols.
@@ -440,44 +449,45 @@ Example
                 desc nil)))
 
        (t (user-error "Invalid key %s" key))))
-    `(progn ,@(nreverse forms))))
+    `(progn ,@(nreverse forms)))))
 #+END_SRC
 
 *** add-hook!
 A macro that makes adding hooks easy
 
 #+BEGIN_SRC emacs-lisp
-(defun bmacs--resolve-hook-forms (hooks)
-  (cl-loop with quoted-p = (eq (car-safe hooks) 'quote)
-           for hook in (bmacs-enlist (doom-unquote hooks))
-           if (eq (car-safe hook) 'quote)
-            collect (cadr hook)
-           else if quoted-p
-            collect hook
-           else collect (intern (format "%s-hook" (symbol-name hook)))))
+(eval-and-compile
+  (defun bmacs--resolve-hook-forms (hooks)
+    (cl-loop with quoted-p = (eq (car-safe hooks) 'quote)
+             for hook in (bmacs-enlist (doom-unquote hooks))
+             if (eq (car-safe hook) 'quote)
+              collect (cadr hook)
+             else if quoted-p
+              collect hook
+             else collect (intern (format "%s-hook" (symbol-name hook)))))
 
-(defvar bmacs--transient-counter 0)
-(defmacro add-transient-hook! (hook &rest forms)
-  "Attaches transient forms to a HOOK.
+  (defvar bmacs--transient-counter 0)
+  (defmacro add-transient-hook! (hook &rest forms)
+    "Attaches transient forms to a HOOK.
 
-HOOK can be a quoted hook or a sharp-quoted function (which will be advised).
+  HOOK can be a quoted hook or a sharp-quoted function (which will be advised).
 
-These forms will be evaluated once when that function/hook is first invoked,
-then it detaches itself."
-  (declare (indent 1))
-  (let ((append (eq (car forms) :after))
-        (fn (intern (format "bmacs-transient-hook-%s" (cl-incf bmacs--transient-counter)))))
-    `(when ,hook
-       (fset ',fn
-             (lambda (&rest _)
-               ,@forms
-               (cond ((functionp ,hook) (advice-remove ,hook #',fn))
-                     ((symbolp ,hook)   (remove-hook ,hook #',fn)))
-               (unintern ',fn nil)))
-       (cond ((functionp ,hook)
-              (advice-add ,hook ,(if append :after :before) #',fn))
-             ((symbolp ,hook)
-              (add-hook ,hook #',fn ,append))))))
+  These forms will be evaluated once when that function/hook is first invoked,
+  then it detaches itself."
+    (declare (indent 1))
+    (let ((append (eq (car forms) :after))
+          (fn (intern (format "bmacs-transient-hook-%s" (cl-incf bmacs--transient-counter)))))
+      `(when ,hook
+         (fset ',fn
+               (lambda (&rest _)
+                 ,@forms
+                 (cond ((functionp ,hook) (advice-remove ,hook #',fn))
+                       ((symbolp ,hook)   (remove-hook ,hook #',fn)))
+                 (unintern ',fn nil)))
+         (cond ((functionp ,hook)
+                (advice-add ,hook ,(if append :after :before) #',fn))
+               ((symbolp ,hook)
+                (add-hook ,hook #',fn ,append)))))))
 
 (defmacro add-hook! (&rest args)
   "A convenience macro for `add-hook'. Takes, in order:
@@ -558,6 +568,39 @@ A simple macro that prevents code from making any noise
        ,@forms)))
 #+END_SRC
 
+*** def-memoized!
+Creates a memoized function
+
+#+BEGIN_SRC emacs-lisp
+(defvar doom-memoized-table (make-hash-table :test 'equal :size 10)
+  "A lookup table containing memoized functions. The keys are argument lists,
+and the value is the function's return value.")
+
+(defun doom-memoize (name)
+  "Memoizes an existing function. NAME is a symbol."
+  (let ((func (symbol-function name)))
+    (put name 'function-documentation
+         (concat (documentation func) " (memoized)"))
+    (fset name
+          `(lambda (&rest args)
+             (let ((key (cons ',name args)))
+               (or (gethash key doom-memoized-table)
+                   (puthash key (apply ',func args)
+                            doom-memoized-table)))))))
+
+(defmacro def-memoized! (name arglist &rest body)
+  "Create a memoize'd function. NAME, ARGLIST, DOCSTRING and BODY
+have the same meaning as in `defun'."
+  (declare (indent defun) (doc-string 3))
+  `(,(if (bound-and-true-p byte-compile-current-file)
+         'with-no-warnings
+       'progn)
+     (defun ,name ,arglist ,@body)
+     (doom-memoize ',name)))
+
+
+#+END_SRC
+
 ** General Configuration
 
 *** Core
@@ -606,7 +649,7 @@ TODO - Sort these out better
 (use-package async :demand t)
 (use-package s :demand t)
 (use-package f :demand t)
-(use-package subr-x :demand t)
+(use-package subr-x :demand t :ensure nil)
 
 #+END_SRC
 
@@ -716,9 +759,9 @@ Enable line numbers
       (setq display-line-numbers nil)
     (nlinum-mode -1)))
 
-(add-hook 'prog-mode #'bmacs|enable-line-numbers)
-(add-hook 'text-mode #'bmacs|enable-line-numbers)
-(add-hook 'conf-mode #'bmacs|enable-line-numbers)
+(add-hook 'prog-mode-hook #'bmacs|enable-line-numbers)
+(add-hook 'text-mode-hook #'bmacs|enable-line-numbers)
+(add-hook 'conf-mode-hook #'bmacs|enable-line-numbers)
 #+END_SRC
 
 *** Editor
@@ -790,6 +833,9 @@ Enable line numbers
                               activate)
                     ,@body))
                commands)))
+
+(defvar bmacs-indent-sensitive-modes '(conf-mode coffee-mode haml-mode python-mode slim-mode yaml-mode)
+  "modes to limit auto indentation on")
 
 (defun bmacs|yank-advised-indent-function (beg end)
   "Do indentation, as long as the region isn't too large."
@@ -2294,25 +2340,16 @@ A super cool dashboard on startup!
             (insert (propertize (+doom-dashboard-center +doom-dashboard--width line)
                                 'face 'font-lock-comment-face) " ")
             (insert "\n"))
-          '("=================     ===============     ===============   ========  ========"
-            "\\\\ . . . . . . .\\\\   //. . . . . . .\\\\   //. . . . . . .\\\\  \\\\. . .\\\\// . . //"
-            "||. . ._____. . .|| ||. . ._____. . .|| ||. . ._____. . .|| || . . .\\/ . . .||"
-            "|| . .||   ||. . || || . .||   ||. . || || . .||   ||. . || ||. . . . . . . ||"
-            "||. . ||   || . .|| ||. . ||   || . .|| ||. . ||   || . .|| || . | . . . . .||"
-            "|| . .||   ||. _-|| ||-_ .||   ||. . || || . .||   ||. _-|| ||-_.|\\ . . . . ||"
-            "||. . ||   ||-'  || ||  `-||   || . .|| ||. . ||   ||-'  || ||  `|\\_ . .|. .||"
-            "|| . _||   ||    || ||    ||   ||_ . || || . _||   ||    || ||   |\\ `-_/| . ||"
-            "||_-' ||  .|/    || ||    \\|.  || `-_|| ||_-' ||  .|/    || ||   | \\  / |-_.||"
-            "||    ||_-'      || ||      `-_||    || ||    ||_-'      || ||   | \\  / |  `||"
-            "||    `'         || ||         `'    || ||    `'         || ||   | \\  / |   ||"
-            "||            .===' `===.         .==='.`===.         .===' /==. |  \\/  |   ||"
-            "||         .=='   \\_|-_ `===. .==='   _|_   `===. .===' _-|/   `==  \\/  |   ||"
-            "||      .=='    _-'    `-_  `='    _-'   `-_    `='  _-'   `-_  /|  \\/  |   ||"
-            "||   .=='    _-'          '-__\\._-'         '-_./__-'         `' |. /|  |   ||"
-            "||.=='    _-'                                                     `' |  /==.||"
-            "=='    _-'                         E M A C S                          \\/   `=="
-            "\\   _-'                                                                `-_   /"
-            " `''                                                                      ``'")))
+          '("$$$$$$$\\  $$\\      $$\\  $$$$$$\\   $$$$$$\\   $$$$$$   "
+            "$$  __$$\\ $$$\\    $$$ |$$  __$$\\ $$  __$$\\ $$  __$$\\ "
+            "$$ |  $$ |$$$$\\  $$$$ |$$ /  $$ |$$ /  \\__|$$ /  \\__|"
+            "$$$$$$$\\ |$$\\$$\\$$ $$ |$$$$$$$$ |$$ |      \\$$$$$$\\  "
+            "$$  __$$\\ $$ \\$$$  $$ |$$  __$$ |$$ |       \\____$$\\ "
+            "$$ |  $$ |$$ |\\$  /$$ |$$ |  $$ |$$ |  $$\\ $$\\   $$ |"
+            "$$$$$$$  |$$ | \\_/ $$ |$$ |  $$ |\\$$$$$$  |\\$$$$$$  |"
+            "\\_______/ \\__|     \\__|\\__|  \\__| \\______/  \\______/ "
+            "                                                     "
+            "                        EMACS                        ")))
 
   (defun doom-dashboard-widget--loaded ()
     (insert
@@ -2346,13 +2383,10 @@ A super cool dashboard on startup!
                      (+doom-dashboard-center (- +doom-dashboard--width 2) (buffer-string)))
                    "\n\n"))))
             `(("Homepage" "mark-github"
-               (browse-url "https://github.com/gilbertw/bmacs"))
+               (browse-url "https://github.com/gilbertw1/bmacs"))
               ,(when (and (file-exists-p (expand-file-name persp-auto-save-fname persp-save-dir)))
                  '("Reload last session" "history"
                    (+workspace/load-session)))
-              ,(when t
-                 '("See agenda for this week" "calendar"
-                   (call-interactively 'org-agenda-list)))
               ("Recently opened files" "file-text"
                (call-interactively (command-remapping 'recentf-open-files)))
               ("Open project" "briefcase"
@@ -2386,6 +2420,749 @@ A super cool dashboard on startup!
   (add-hook 'after-make-frame-functions #'+doom-dashboard|make-frame)
   (add-hook 'server-visit-hook #'+doom-dashboard|server-visit)
   (add-hook '+doom-dashboard-mode-hook #'+vi-tilde-fringe|disable)
+#+END_SRC
+
+*** doom-modeline
+The awesome modeline from Doom
+
+#+BEGIN_SRC emacs-lisp
+(defvar-local doom--modeline-format nil
+  "The modeline format to use when `doom-hide-modeline-mode' is active. Don't
+set this directly. Let-bind it instead.")
+(defvar-local doom--old-modeline-format nil
+  "The old modeline format, so `doom-hide-modeline-mode' can revert when it's
+disabled.")
+(define-minor-mode doom-hide-modeline-mode
+  "Minor mode to hide the mode-line in the current buffer."
+  :init-value nil
+  :global nil
+  (if doom-hide-modeline-mode
+      (setq doom--old-modeline-format mode-line-format
+            mode-line-format doom--modeline-format)
+    (setq mode-line-format doom--old-modeline-format
+          doom--old-modeline-format nil))
+  (force-mode-line-update))
+;; Ensure major-mode or theme changes don't overwrite these variables
+(put 'doom--modeline-format 'permanent-local t)
+(put 'doom--old-modeline-format 'permanent-local t)
+(put 'doom-hide-modeline-mode 'permanent-local t)
+
+(defun doom|hide-modeline-mode-reset ()
+  "Sometimes, a major-mode is activated after `doom-hide-modeline-mode' is
+activated, thus disabling it (because changing major modes invokes
+`kill-all-local-variables' and specifically seems to kill `mode-line-format's
+local value, whether or not it's permanent-local. Therefore, we cycle
+`doom-hide-modeline-mode' to fix this."
+  (when doom-hide-modeline-mode
+    (doom-hide-modeline-mode -1)
+    (doom-hide-modeline-mode +1)))
+(add-hook 'after-change-major-mode-hook #'doom|hide-modeline-mode-reset)
+
+
+(defmacro def-modeline-segment! (name &rest forms)
+  "Defines a modeline segment and byte compiles it."
+  (declare (indent defun) (doc-string 2))
+  (let ((sym (intern (format "doom-modeline-segment--%s" name))))
+    `(progn
+       (defun ,sym () ,@forms)
+       ,(unless (bound-and-true-p byte-compile-current-file)
+          `(let (byte-compile-warnings)
+             (byte-compile #',sym))))))
+
+(defsubst doom--prepare-modeline-segments (segments)
+  (cl-loop for seg in segments
+           if (stringp seg)
+            collect seg
+           else
+            collect (list (intern (format "doom-modeline-segment--%s" (symbol-name seg))))))
+
+(defmacro def-modeline! (name lhs &optional rhs)
+  "Defines a modeline format and byte-compiles it. NAME is a symbol to identify
+it (used by `doom-modeline' for retrieval). LHS and RHS are lists of symbols of
+modeline segments defined with `def-modeline-segment!'.
+Example:
+  (def-modeline! minimal
+    (bar matches \" \" buffer-info)
+    (media-info major-mode))
+  (doom-set-modeline 'minimal t)"
+  (let ((sym (intern (format "doom-modeline-format--%s" name)))
+        (lhs-forms (doom--prepare-modeline-segments lhs))
+        (rhs-forms (doom--prepare-modeline-segments rhs)))
+    `(progn
+       (defun ,sym ()
+         (let ((lhs (list ,@lhs-forms))
+               (rhs (list ,@rhs-forms)))
+           (let ((rhs-str (format-mode-line rhs)))
+             (list lhs
+                   (propertize
+                    " " 'display
+                    `((space :align-to (- (+ right right-fringe right-margin)
+                                          ,(+ 1 (string-width rhs-str))))))
+                   rhs-str))))
+       ,(unless (bound-and-true-p byte-compile-current-file)
+          `(let (byte-compile-warnings)
+             (byte-compile #',sym))))))
+
+(defun doom-modeline (key)
+  "Returns a mode-line configuration associated with KEY (a symbol). Throws an
+error if it doesn't exist."
+  (let ((fn (intern (format "doom-modeline-format--%s" key))))
+    (when (functionp fn)
+      `(:eval (,fn)))))
+
+(defun doom-set-modeline (key &optional default)
+  "Set the modeline format. Does nothing if the modeline KEY doesn't exist. If
+DEFAULT is non-nil, set the default mode-line for all buffers."
+  (when-let (modeline (doom-modeline key))
+    (setf (if default
+              (default-value 'mode-line-format)
+            (buffer-local-value 'mode-line-format (current-buffer)))
+          modeline)))
+
+
+;; no modeline in completion popups
+(add-hook 'completion-list-mode-hook #'doom-hide-modeline-mode)
+
+(use-package eldoc-eval
+  :demand t
+  :config
+  (defun +doom-modeline-eldoc (text)
+    (concat (when (display-graphic-p)
+              (+doom-modeline--make-xpm
+               (face-background 'doom-modeline-eldoc-bar nil t)
+               +doom-modeline-height
+               +doom-modeline-bar-width))
+            text))
+
+  ;; Show eldoc in the mode-line with `eval-expression'
+  (defun +doom-modeline--show-eldoc (input)
+    "Display string STR in the mode-line next to minibuffer."
+    (with-current-buffer (eldoc-current-buffer)
+      (let* ((str              (and (stringp input) input))
+             (mode-line-format (or (and str (or (+doom-modeline-eldoc str) str))
+                                   mode-line-format))
+             mode-line-in-non-selected-windows)
+        (force-mode-line-update)
+        (sit-for eldoc-show-in-mode-line-delay))))
+
+  (setq eldoc-in-minibuffer-show-fn #'+doom-modeline--show-eldoc)
+  (eldoc-in-minibuffer-mode +1))
+
+;; anzu and evil-anzu expose current/total state that can be displayed in the
+;; mode-line.
+(use-package evil-anzu
+  :when (featurep 'evil)
+  :init
+  (add-transient-hook! #'evil-ex-start-search (require 'evil-anzu))
+  (add-transient-hook! #'evil-ex-start-word-search (require 'evil-anzu))
+  :config
+  (setq anzu-cons-mode-line-p nil
+        anzu-minimum-input-length 1
+        anzu-search-threshold 250)
+
+  ;; Avoid anzu conflicts across buffers
+  (mapc #'make-variable-buffer-local
+        '(anzu--total-matched anzu--current-position anzu--state
+          anzu--cached-count anzu--cached-positions anzu--last-command
+          anzu--last-isearch-string anzu--overflow-p))
+
+  ;; Ensure anzu state is cleared when searches & iedit are done
+  (add-hook 'isearch-mode-end-hook #'anzu--reset-status t)
+  (add-hook '+evil-esc-hook #'anzu--reset-status t)
+  (add-hook 'iedit-mode-end-hook #'anzu--reset-status))
+
+
+;; Keep `+doom-modeline-current-window' up-to-date
+(defvar +doom-modeline-current-window (frame-selected-window))
+(defun +doom-modeline|set-selected-window (&rest _)
+  "Sets `+doom-modeline-current-window' appropriately"
+  (let ((win (frame-selected-window)))
+    (unless (minibuffer-window-active-p win)
+      (setq +doom-modeline-current-window win))))
+
+(add-hook 'window-configuration-change-hook #'+doom-modeline|set-selected-window)
+(add-hook 'focus-in-hook #'+doom-modeline|set-selected-window)
+(advice-add #'handle-switch-frame :after #'+doom-modeline|set-selected-window)
+(advice-add #'select-window :after #'+doom-modeline|set-selected-window)
+
+;; fish-style modeline
+(use-package shrink-path
+  :commands (shrink-path-prompt shrink-path-file-mixed))
+
+
+;;
+;; Variables
+;;
+
+(defvar +doom-modeline-height 29
+  "How tall the mode-line should be (only respected in GUI emacs).")
+
+(defvar +doom-modeline-bar-width 3
+  "How wide the mode-line bar should be (only respected in GUI emacs).")
+
+(defvar +doom-modeline-vspc
+  (propertize " " 'face 'variable-pitch)
+  "TODO")
+
+(defvar +doom-modeline-buffer-file-name-style 'truncate-upto-project
+  "Determines the style used by `+doom-modeline-buffer-file-name'.
+Given ~/Projects/FOSS/emacs/lisp/comint.el
+truncate-upto-project => ~/P/F/emacs/lisp/comint.el
+truncate-upto-root => ~/P/F/e/lisp/comint.el
+truncate-all => ~/P/F/e/l/comint.el
+relative-from-project => emacs/lisp/comint.el
+relative-to-project => lisp/comint.el
+file-name => comint.el")
+
+;; externs
+(defvar anzu--state nil)
+(defvar evil-mode nil)
+(defvar evil-state nil)
+(defvar evil-visual-selection nil)
+(defvar iedit-mode nil)
+(defvar all-the-icons-scale-factor)
+(defvar all-the-icons-default-adjust)
+
+
+;;
+;; Custom faces
+;;
+
+(defgroup +doom-modeline nil
+  ""
+  :group 'doom)
+
+(defface doom-modeline-buffer-path
+  '((t (:inherit mode-line-emphasis :bold t)))
+  "Face used for the dirname part of the buffer path."
+  :group '+doom-modeline)
+
+(defface doom-modeline-buffer-file
+  '((t (:inherit mode-line-buffer-id)))
+  "Face used for the filename part of the mode-line buffer path."
+  :group '+doom-modeline)
+
+(defface doom-modeline-buffer-modified
+  '((t (:inherit error :background nil :bold t)))
+  "Face used for the 'unsaved' symbol in the mode-line."
+  :group '+doom-modeline)
+
+(defface doom-modeline-buffer-major-mode
+  '((t (:inherit mode-line-emphasis :bold t)))
+  "Face used for the major-mode segment in the mode-line."
+  :group '+doom-modeline)
+
+(defface doom-modeline-highlight
+  '((t (:inherit mode-line-emphasis)))
+  "Face for bright segments of the mode-line."
+  :group '+doom-modeline)
+
+(defface doom-modeline-panel
+  '((t (:inherit mode-line-highlight)))
+  "Face for 'X out of Y' segments, such as `+doom-modeline--anzu', `+doom-modeline--evil-substitute' and
+`iedit'"
+  :group '+doom-modeline)
+
+(defface doom-modeline-info
+  `((t (:inherit success :bold t)))
+  "Face for info-level messages in the modeline. Used by `*vc'."
+  :group '+doom-modeline)
+
+(defface doom-modeline-warning
+  `((t (:inherit warning :bold t)))
+  "Face for warnings in the modeline. Used by `*flycheck'"
+  :group '+doom-modeline)
+
+(defface doom-modeline-urgent
+  `((t (:inherit error :bold t)))
+  "Face for errors in the modeline. Used by `*flycheck'"
+  :group '+doom-modeline)
+
+;; Bar
+(defface doom-modeline-bar '((t (:inherit highlight)))
+  "The face used for the left-most bar on the mode-line of an active window."
+  :group '+doom-modeline)
+
+(defface doom-modeline-eldoc-bar '((t (:inherit shadow)))
+  "The face used for the left-most bar on the mode-line when eldoc-eval is
+active."
+  :group '+doom-modeline)
+
+(defface doom-modeline-inactive-bar '((t (:inherit warning :inverse-video t)))
+  "The face used for the left-most bar on the mode-line of an inactive window."
+  :group '+doom-modeline)
+
+
+;;
+;; Modeline helpers
+;;
+
+(defsubst active ()
+  (eq (selected-window) +doom-modeline-current-window))
+
+;; Inspired from `powerline's `pl/make-xpm'.
+(def-memoized! +doom-modeline--make-xpm (color height width)
+  "Create an XPM bitmap."
+  (propertize
+   " " 'display
+   (let ((data (make-list height (make-list width 1)))
+         (color (or color "None")))
+     (create-image
+      (concat
+       (format "/* XPM */\nstatic char * percent[] = {\n\"%i %i 2 1\",\n\". c %s\",\n\"  c %s\","
+               (length (car data))
+               (length data)
+               color
+               color)
+       (apply #'concat
+              (cl-loop with idx = 0
+                       with len = (length data)
+                       for dl in data
+                       do (cl-incf idx)
+                       collect
+                       (concat "\""
+                               (cl-loop for d in dl
+                                        if (= d 0) collect (string-to-char " ")
+                                        else collect (string-to-char "."))
+                               (if (eq idx len) "\"};" "\",\n")))))
+      'xpm t :ascent 'center))))
+
+(defun +doom-modeline-buffer-file-name ()
+  "Propertized `buffer-file-name' based on `+doom-modeline-buffer-file-name-style'."
+  (propertize
+   (pcase +doom-modeline-buffer-file-name-style
+     ('truncate-upto-project (+doom-modeline--buffer-file-name 'shrink))
+     ('truncate-upto-root (+doom-modeline--buffer-file-name-truncate))
+     ('truncate-all (+doom-modeline--buffer-file-name-truncate t))
+     ('relative-to-project (+doom-modeline--buffer-file-name-relative))
+     ('relative-from-project (+doom-modeline--buffer-file-name-relative 'include-project))
+     ('file-name (propertize (file-name-nondirectory buffer-file-name)
+                             'face
+                             (let ((face (or (and (buffer-modified-p)
+                                                  'doom-modeline-buffer-modified)
+                                             (and (active)
+                                                  'doom-modeline-buffer-file))))
+                               (when face `(:inherit ,face))))))
+   'help-echo buffer-file-truename))
+
+(defun +doom-modeline--buffer-file-name-truncate (&optional truncate-tail)
+  "Propertized `buffer-file-name' that truncates every dir along path.
+If TRUNCATE-TAIL is t also truncate the parent directory of the file."
+  (let ((dirs (shrink-path-prompt (file-name-directory
+                                   (or buffer-file-truename
+                                       (file-truename buffer-file-name)))))
+        (active (active)))
+    (if (null dirs)
+        (propertize "%b" 'face (if active 'doom-modeline-buffer-file))
+      (let ((modified-faces (if (buffer-modified-p) 'doom-modeline-buffer-modified)))
+        (let ((dirname (car dirs))
+              (basename (cdr dirs))
+              (dir-faces (or modified-faces (if active 'doom-modeline-project-root-dir)))
+              (file-faces (or modified-faces (if active 'doom-modeline-buffer-file))))
+          (concat (propertize (concat dirname
+                                      (if truncate-tail (substring basename 0 1) basename)
+                                      "/")
+                              'face (if dir-faces `(:inherit ,dir-faces)))
+                  (propertize (file-name-nondirectory buffer-file-name)
+                              'face (if file-faces `(:inherit ,file-faces)))))))))
+
+(defun +doom-modeline--buffer-file-name-relative (&optional include-project)
+  "Propertized `buffer-file-name' showing directories relative to project's root only."
+  (let ((root (bmacs-project-root))
+        (active (active)))
+    (if (null root)
+        (propertize "%b" 'face (if active 'doom-modeline-buffer-file))
+      (let* ((modified-faces (if (buffer-modified-p) 'doom-modeline-buffer-modified))
+             (relative-dirs (file-relative-name (file-name-directory buffer-file-name)
+                                                (if include-project (concat root "../") root)))
+             (relative-faces (or modified-faces (if active 'doom-modeline-buffer-path)))
+             (file-faces (or modified-faces (if active 'doom-modeline-buffer-file))))
+        (if (equal "./" relative-dirs) (setq relative-dirs ""))
+        (concat (propertize relative-dirs 'face (if relative-faces `(:inherit ,relative-faces)))
+                (propertize (file-name-nondirectory buffer-file-name)
+                            'face (if file-faces `(:inherit ,file-faces))))))))
+
+(defun +doom-modeline--buffer-file-name (truncate-project-root-parent)
+  "Propertized `buffer-file-name'.
+If TRUNCATE-PROJECT-ROOT-PARENT is t space will be saved by truncating it down
+fish-shell style.
+Example:
+~/Projects/FOSS/emacs/lisp/comint.el => ~/P/F/emacs/lisp/comint.el"
+  (let* ((project-root (bmacs-project-root))
+         (file-name-split (shrink-path-file-mixed project-root
+                                                  (file-name-directory
+                                                   (or buffer-file-truename
+                                                       (file-truename buffer-file-name)))
+                                                  (file-truename buffer-file-name)))
+         (active (active)))
+    (if (null file-name-split)
+        (propertize "%b" 'face (if active 'doom-modeline-buffer-file))
+      (pcase-let ((`(,root-path-parent ,project ,relative-path ,filename) file-name-split))
+        (let ((modified-faces (if (buffer-modified-p) 'doom-modeline-buffer-modified)))
+          (let ((sp-faces       (or modified-faces (if active 'font-lock-comment-face)))
+                (project-faces  (or modified-faces (if active 'font-lock-string-face)))
+                (relative-faces (or modified-faces (if active 'doom-modeline-buffer-path)))
+                (file-faces     (or modified-faces (if active 'doom-modeline-buffer-file))))
+            (let ((sp-props       `(,@(if sp-faces       `(:inherit ,sp-faces))      ,@(if active '(:weight bold))))
+                  (project-props  `(,@(if project-faces  `(:inherit ,project-faces)) ,@(if active '(:weight bold))))
+                  (relative-props `(,@(if relative-faces `(:inherit ,relative-faces))))
+                  (file-props     `(,@(if file-faces     `(:inherit ,file-faces)))))
+              (concat (propertize (if truncate-project-root-parent
+                                      root-path-parent
+                                    (abbreviate-file-name project-root))
+                                  'face sp-props)
+                      (propertize (concat project "/") 'face project-props)
+                      (when relative-path (propertize relative-path 'face relative-props))
+                      (propertize filename 'face file-props)))))))))
+
+
+;;
+;; Segments
+;;
+
+(def-modeline-segment! buffer-default-directory
+  "Displays `default-directory'. This is for special buffers like the scratch
+buffer where knowing the current project directory is important."
+  (let ((face (if (active) 'doom-modeline-buffer-path)))
+    (concat (if (display-graphic-p) " ")
+            (all-the-icons-octicon
+             "file-directory"
+             :face face
+             :v-adjust -0.05
+             :height 1.25)
+            (propertize (concat " " (abbreviate-file-name default-directory))
+                        'face face))))
+
+;;
+(def-modeline-segment! buffer-info
+  "Combined information about the current buffer, including the current working
+directory, the file name, and its state (modified, read-only or non-existent)."
+  (let ((all-the-icons-scale-factor 1.2))
+    (concat (cond (buffer-read-only
+                   (concat (all-the-icons-octicon
+                            "lock"
+                            :face 'doom-modeline-warning
+                            :v-adjust -0.05)
+                           " "))
+                  ((buffer-modified-p)
+                   (concat (all-the-icons-faicon
+                            "floppy-o"
+                            :face 'doom-modeline-buffer-modified
+                            :v-adjust -0.0575)
+                           " "))
+                  ((and buffer-file-name
+                        (not (file-exists-p buffer-file-name)))
+                   (concat (all-the-icons-octicon
+                            "circle-slash"
+                            :face 'doom-modeline-urgent
+                            :v-adjust -0.05)
+                           " "))
+                  ((buffer-narrowed-p)
+                   (concat (all-the-icons-octicon
+                            "fold"
+                            :face 'doom-modeline-warning
+                            :v-adjust -0.05)
+                           " ")))
+            (if buffer-file-name
+                (+doom-modeline-buffer-file-name)
+              "%b"))))
+
+;;
+(def-modeline-segment! buffer-info-simple
+  "Display only the current buffer's name, but with fontification."
+  (propertize
+   "%b"
+   'face (cond ((and buffer-file-name (buffer-modified-p))
+                'doom-modeline-buffer-modified)
+               ((active) 'doom-modeline-buffer-file))))
+
+;;
+(def-modeline-segment! buffer-encoding
+  "Displays the encoding and eol style of the buffer the same way Atom does."
+  (concat (pcase (coding-system-eol-type buffer-file-coding-system)
+            (0 "LF  ")
+            (1 "CRLF  ")
+            (2 "CR  "))
+          (let ((sys (coding-system-plist buffer-file-coding-system)))
+            (cond ((memq (plist-get sys :category) '(coding-category-undecided coding-category-utf-8))
+                   "UTF-8")
+                  (t (upcase (symbol-name (plist-get sys :name))))))
+          "  "))
+
+;;
+(def-modeline-segment! major-mode
+  "The major mode, including process, environment and text-scale info."
+  (propertize
+   (concat (format-mode-line mode-name)
+           (when (stringp mode-line-process)
+             mode-line-process)
+           (and (featurep 'face-remap)
+                (/= text-scale-mode-amount 0)
+                (format " (%+d)" text-scale-mode-amount)))
+   'face (if (active) 'doom-modeline-buffer-major-mode)))
+
+;;
+(def-modeline-segment! vcs
+  "Displays the current branch, colored based on its state."
+  (when (and vc-mode buffer-file-name)
+    (let* ((backend (vc-backend buffer-file-name))
+           (state   (vc-state buffer-file-name backend)))
+      (let ((face    'mode-line-inactive)
+            (active  (active))
+            (all-the-icons-scale-factor 1.0)
+            (all-the-icons-default-adjust -0.1))
+        (concat "  "
+                (cond ((memq state '(edited added))
+                       (if active (setq face 'doom-modeline-info))
+                       (all-the-icons-octicon
+                        "git-compare"
+                        :face face
+                        :height 1.2
+                        :v-adjust -0.05))
+                      ((eq state 'needs-merge)
+                       (if active (setq face 'doom-modeline-info))
+                       (all-the-icons-octicon "git-merge" :face face))
+                      ((eq state 'needs-update)
+                       (if active (setq face 'doom-modeline-warning))
+                       (all-the-icons-octicon "arrow-down" :face face))
+                      ((memq state '(removed conflict unregistered))
+                       (if active (setq face 'doom-modeline-urgent))
+                       (all-the-icons-octicon "alert" :face face))
+                      (t
+                       (if active (setq face 'font-lock-doc-face))
+                       (all-the-icons-octicon
+                        "git-compare"
+                        :face face
+                        :height 1.2
+                        :v-adjust -0.05)))
+                " "
+                (propertize (substring vc-mode (+ (if (eq backend 'Hg) 2 3) 2))
+                            'face (if active face))
+                " ")))))
+
+;;
+(defun +doom-ml-icon (icon &optional text face voffset)
+  "Displays an octicon ICON with FACE, followed by TEXT. Uses
+`all-the-icons-octicon' to fetch the icon."
+  (concat (if vc-mode " " "  ")
+          (when icon
+            (concat
+             (all-the-icons-material icon :face face :height 1.1 :v-adjust (or voffset -0.2))
+             (if text +doom-modeline-vspc)))
+          (when text
+            (propertize text 'face face))
+          (if vc-mode "  " " ")))
+
+(def-modeline-segment! flycheck
+  "Displays color-coded flycheck error status in the current buffer with pretty
+icons."
+  (when (boundp 'flycheck-last-status-change)
+    (pcase flycheck-last-status-change
+      ('finished (if flycheck-current-errors
+                     (let-alist (flycheck-count-errors flycheck-current-errors)
+                       (let ((sum (+ (or .error 0) (or .warning 0))))
+                         (+doom-ml-icon "do_not_disturb_alt"
+                                        (number-to-string sum)
+                                        (if .error 'doom-modeline-urgent 'doom-modeline-warning)
+                                        -0.25)))
+                   (+doom-ml-icon "check" nil 'doom-modeline-info)))
+      ('running     (+doom-ml-icon "access_time" nil 'font-lock-doc-face -0.25))
+      ('no-checker  (+doom-ml-icon "sim_card_alert" "-" 'font-lock-doc-face))
+      ('errored     (+doom-ml-icon "sim_card_alert" "Error" 'doom-modeline-urgent))
+      ('interrupted (+doom-ml-icon "pause" "Interrupted" 'font-lock-doc-face)))))
+      ;; ('interrupted (+doom-ml-icon "x" "Interrupted" 'font-lock-doc-face)))))
+
+;;
+(defsubst doom-column (pos)
+  (save-excursion (goto-char pos)
+                  (current-column)))
+
+(def-modeline-segment! selection-info
+  "Information about the current selection, such as how many characters and
+lines are selected, or the NxM dimensions of a block selection."
+  (when (and (active) (or mark-active (eq evil-state 'visual)))
+    (let ((reg-beg (region-beginning))
+          (reg-end (region-end)))
+      (propertize
+       (let ((lines (count-lines reg-beg (min (1+ reg-end) (point-max)))))
+         (cond ((or (bound-and-true-p rectangle-mark-mode)
+                    (eq 'block evil-visual-selection))
+                (let ((cols (abs (- (doom-column reg-end)
+                                    (doom-column reg-beg)))))
+                  (format "%dx%dB" lines cols)))
+               ((eq 'line evil-visual-selection)
+                (format "%dL" lines))
+               ((> lines 1)
+                (format "%dC %dL" (- (1+ reg-end) reg-beg) lines))
+               (t
+                (format "%dC" (- (1+ reg-end) reg-beg)))))
+       'face 'doom-modeline-highlight))))
+
+
+;;
+(defun +doom-modeline--macro-recording ()
+  "Display current Emacs or evil macro being recorded."
+  (when (and (active) (or defining-kbd-macro executing-kbd-macro))
+    (let ((sep (propertize " " 'face 'doom-modeline-panel)))
+      (concat sep
+              (propertize (if (bound-and-true-p evil-this-macro)
+                              (char-to-string evil-this-macro)
+                            "Macro")
+                          'face 'doom-modeline-panel)
+              sep
+              (all-the-icons-octicon "triangle-right"
+                                     :face 'doom-modeline-panel
+                                     :v-adjust -0.05)
+              sep))))
+
+(defsubst +doom-modeline--anzu ()
+  "Show the match index and total number thereof. Requires `anzu', also
+`evil-anzu' if using `evil-mode' for compatibility with `evil-search'."
+  (when (and anzu--state (not iedit-mode))
+    (propertize
+     (let ((here anzu--current-position)
+           (total anzu--total-matched))
+       (cond ((eq anzu--state 'replace-query)
+              (format " %d replace " total))
+             ((eq anzu--state 'replace)
+              (format " %d/%d " here total))
+             (anzu--overflow-p
+              (format " %s+ " total))
+             (t
+              (format " %s/%d " here total))))
+     'face (if (active) 'doom-modeline-panel))))
+
+(defsubst +doom-modeline--evil-substitute ()
+  "Show number of matches for evil-ex substitutions and highlights in real time."
+  (when (and evil-mode
+             (or (assq 'evil-ex-substitute evil-ex-active-highlights-alist)
+                 (assq 'evil-ex-global-match evil-ex-active-highlights-alist)
+                 (assq 'evil-ex-buffer-match evil-ex-active-highlights-alist)))
+    (propertize
+     (let ((range (if evil-ex-range
+                      (cons (car evil-ex-range) (cadr evil-ex-range))
+                    (cons (line-beginning-position) (line-end-position))))
+           (pattern (car-safe (evil-delimited-arguments evil-ex-argument 2))))
+       (if pattern
+           (format " %s matches " (how-many pattern (car range) (cdr range)))
+         " - "))
+     'face (if (active) 'doom-modeline-panel))))
+
+(defun doom-themes--overlay-sort (a b)
+  (< (overlay-start a) (overlay-start b)))
+
+(defsubst +doom-modeline--iedit ()
+  "Show the number of iedit regions matches + what match you're on."
+  (when (and iedit-mode iedit-occurrences-overlays)
+    (propertize
+     (let ((this-oc (or (let ((inhibit-message t))
+                          (iedit-find-current-occurrence-overlay))
+                        (progn (iedit-prev-occurrence)
+                               (iedit-find-current-occurrence-overlay))))
+           (length (length iedit-occurrences-overlays)))
+       (format " %s/%d "
+               (if this-oc
+                   (- length
+                      (length (memq this-oc (sort (append iedit-occurrences-overlays nil)
+                                                  #'doom-themes--overlay-sort)))
+                      -1)
+                 "-")
+               length))
+     'face (if (active) 'doom-modeline-panel))))
+
+(def-modeline-segment! matches
+  "Displays: 1. the currently recording macro, 2. A current/total for the
+current search term (with anzu), 3. The number of substitutions being conducted
+with `evil-ex-substitute', and/or 4. The number of active `iedit' regions."
+  (let ((meta (concat (+doom-modeline--macro-recording)
+                      (+doom-modeline--anzu)
+                      (+doom-modeline--evil-substitute)
+                      (+doom-modeline--iedit))))
+     (or (and (not (equal meta "")) meta)
+         (if buffer-file-name " %I "))))
+
+;; TODO Include other information
+(def-modeline-segment! media-info
+  "Metadata regarding the current file, such as dimensions for images."
+  (cond ((eq major-mode 'image-mode)
+         (cl-destructuring-bind (width . height)
+             (image-size (image-get-display-property) :pixels)
+           (format "  %dx%d  " width height)))))
+
+(def-modeline-segment! bar
+  "The bar regulates the height of the mode-line in GUI Emacs.
+Returns \"\" to not break --no-window-system."
+  (if (display-graphic-p)
+      (+doom-modeline--make-xpm
+       (face-background (if (active)
+                            'doom-modeline-bar
+                          'doom-modeline-inactive-bar)
+                        nil t)
+       +doom-modeline-height
+       +doom-modeline-bar-width)
+    ""))
+
+
+;;
+;; Mode lines
+;;
+
+(def-modeline! main
+  (bar matches " " buffer-info "  %l:%c %p  " selection-info)
+  (buffer-encoding major-mode vcs flycheck))
+
+(def-modeline! minimal
+  (bar matches " " buffer-info)
+  (media-info major-mode))
+
+(def-modeline! special
+  (bar matches " " buffer-info-simple "  %l:%c %p  " selection-info)
+  (buffer-encoding major-mode flycheck))
+
+(def-modeline! project
+  (bar buffer-default-directory)
+  (major-mode))
+
+(def-modeline! media
+  (bar " %b  ")
+  (media-info major-mode))
+
+
+;;
+;; Hooks
+;;
+
+(defun +doom-modeline|init ()
+  "Set the default modeline."
+  (doom-set-modeline 'main t)
+
+  ;; This scratch buffer is already created and doesn't get a modeline. For the
+  ;; love of Emacs, someone give the man a modeline!
+  (with-current-buffer "*scratch*"
+    (doom-set-modeline 'main)))
+
+(defun +doom-modeline|set-special-modeline ()
+  (doom-set-modeline 'special))
+
+(defun +doom-modeline|set-media-modeline ()
+  (doom-set-modeline 'media))
+
+(defun +doom-modeline|set-project-modeline ()
+  (doom-set-modeline 'project))
+
+
+;;
+;; Bootstrap
+;;
+
+(add-hook 'bmacs-post-init-hook #'+doom-modeline|init)
+(add-hook 'doom-scratch-buffer-hook #'+doom-modeline|set-special-modeline)
+(add-hook '+doom-dashboard-mode-hook #'+doom-modeline|set-project-modeline)
+
+(add-hook 'org-src-mode-hook #'+doom-modeline|set-special-modeline)
+(add-hook 'image-mode-hook   #'+doom-modeline|set-media-modeline)
+(add-hook 'circe-mode-hook   #'+doom-modeline|set-special-modeline)
+
 #+END_SRC
 
 *** TODO doom-modeline
@@ -4464,12 +5241,12 @@ Java, but Microsoft
         (:localleader
          :n "b" #'omnisharp-recompile
 
-         (:prefix "r"
-           :n "i"  #'omnisharp-fix-code-issue-at-point
-           :n "u"  #'omnisharp-fix-usings
-           :n "r"  #'omnisharp-rename
-           :n "a"  #'omnisharp-show-last-auto-complete-result
-           :n "o"  #'omnisharp-show-overloads-at-point)
+         ; (:prefix "r"
+         ;   :n "i"  #'omnisharp-fix-code-issue-at-point
+         ;   :n "u"  #'omnisharp-fix-usings
+         ;   :n "r"  #'omnisharp-rename
+         ;   :n "a"  #'omnisharp-show-last-auto-complete-result
+         ;   :n "o"  #'omnisharp-show-overloads-at-point)
 
          (:prefix "f"
            :n "u"  #'omnisharp-find-usages
@@ -5016,7 +5793,7 @@ The language of CEO's
 
   ;; default is 10; this optimizes `smartparens' performance, but limits sp
   ;; pairs to 6 characters.
-  (add-hook php-mode (setq-local sp-max-pair-length 6))
+  (add-hook 'php-mode-hook (setq-local sp-max-pair-length 6))
 
   (sp-with-modes '(php-mode)
     (sp-local-pair "/* "    "*/" :post-handlers '(("||\n[i] " "RET") ("| " "SPC")))
@@ -5235,18 +6012,18 @@ environment variables."
               +ruby-current-version version-str)
         (when (member version-str +ruby-rbenv-versions)
           (setenv "RBENV_VERSION" version-str))))
-    (add-hook 'ruby-mode-hook #'+ruby|detect-rbenv-version))
+    (add-hook 'ruby-mode-hook #'+ruby|detect-rbenv-version)))
 
-  (map! :map ruby-mode-map
-        :localleader
-        :prefix "r"
-        :nv "b"  #'ruby-toggle-block
-        :nv "ec" #'ruby-refactor-extract-constant
-        :nv "el" #'ruby-refactor-extract-to-let
-        :nv "em" #'ruby-refactor-extract-to-method
-        :nv "ev" #'ruby-refactor-extract-local-variable
-        :nv "ad" #'ruby-refactor-add-parameter
-        :nv "cc" #'ruby-refactor-convert-post-conditional))
+  ; (map! :map ruby-mode-map
+  ;       (:localleader
+  ;       (:prefix "r"
+  ;        :nv "b"  #'ruby-toggle-block
+  ;        :nv "ec" #'ruby-refactor-extract-constant
+  ;        :nv "el" #'ruby-refactor-extract-to-let
+  ;        :nv "em" #'ruby-refactor-extract-to-method
+  ;        :nv "ev" #'ruby-refactor-extract-local-variable
+  ;        :nv "ad" #'ruby-refactor-add-parameter
+  ;        :nv "cc" #'ruby-refactor-convert-post-conditional))))
 #+END_SRC
 
 *** Rust
@@ -5510,7 +6287,8 @@ Get Scwhifty!
   (setq web-mode-enable-html-entities-fontification t)
 
   (map! :map web-mode-map
-        (:localleader :n "rt" #'web-mode-element-rename)
+        (:localleader
+        :n "rt" #'web-mode-element-rename)
         "M-/" #'web-mode-comment-or-uncomment
         :i  "SPC" #'self-insert-command
         :n  "M-r" #'doom/web-refresh-browser
@@ -5661,51 +6439,25 @@ Improved help commands
 *** File Functions
 
 #+BEGIN_SRC emacs-lisp
-(defun bmacs/copy-file ()
-  "Write the file under new name."
-  (interactive)
-  (call-interactively 'write-file))
+  (defun bmacs/copy-file ()
+    "Write the file under new name."
+    (interactive)
+    (call-interactively 'write-file))
 
-(defun bmacs/rename-file (filename &optional new-filename)
-  "Rename FILENAME to NEW-FILENAME.
+  (defun bmacs/rename-file (filename &optional new-filename)
+    "Rename FILENAME to NEW-FILENAME.
 
-When NEW-FILENAME is not specified, asks user for a new name.
+  When NEW-FILENAME is not specified, asks user for a new name.
 
-Also renames associated buffer (if any exists), invalidates
-projectile cache when it's possible and update recentf list."
-  (interactive "f")
-  (when (and filename (file-exists-p filename))
-    (let* ((buffer (find-buffer-visiting filename))
-           (short-name (file-name-nondirectory filename))
-           (new-name (if new-filename new-filename
-                       (read-file-name
-                        (format "Rename %s to: " short-name)))))
-      (cond ((get-buffer new-name)
-             (error "A buffer named '%s' already exists!" new-name))
-            (t
-             (let ((dir (file-name-directory new-name)))
-               (when (and (not (file-exists-p dir)) (yes-or-no-p (format "Create directory '%s'?" dir)))
-                 (make-directory dir t)))
-             (rename-file filename new-name 1)
-             (when buffer
-               (kill-buffer buffer)
-               (find-file new-name))
-             (when (fboundp 'recentf-add-file)
-               (recentf-add-file new-name)
-               (recentf-remove-if-non-kept filename))
-             (when (projectile-project-p)
-               (call-interactively #'projectile-invalidate-cache))
-             (message "File '%s' successfully renamed to '%s'" short-name (file-name-nondirectory new-name)))))))
-
-(defun bmacs/rename-current-buffer-file ()
-  "Renames current buffer and file it is visiting."
-  (interactive)
-  (let* ((name (buffer-name))
-        (filename (buffer-file-name)))
-    (if (not (and filename (file-exists-p filename)))
-        (error "Buffer '%s' is not visiting a file!" name)
-      (let* ((dir (file-name-directory filename))
-             (new-name (read-file-name "New name: " dir)))
+  Also renames associated buffer (if any exists), invalidates
+  projectile cache when it's possible and update recentf list."
+    (interactive "f")
+    (when (and filename (file-exists-p filename))
+      (let* ((buffer (find-buffer-visiting filename))
+             (short-name (file-name-nondirectory filename))
+             (new-name (if new-filename new-filename
+                         (read-file-name
+                          (format "Rename %s to: " short-name)))))
         (cond ((get-buffer new-name)
                (error "A buffer named '%s' already exists!" new-name))
               (t
@@ -5713,130 +6465,161 @@ projectile cache when it's possible and update recentf list."
                  (when (and (not (file-exists-p dir)) (yes-or-no-p (format "Create directory '%s'?" dir)))
                    (make-directory dir t)))
                (rename-file filename new-name 1)
-               (rename-buffer new-name)
-               (set-visited-file-name new-name)
-               (set-buffer-modified-p nil)
+               (when buffer
+                 (kill-buffer buffer)
+                 (find-file new-name))
                (when (fboundp 'recentf-add-file)
-                   (recentf-add-file new-name)
-                   (recentf-remove-if-non-kept filename))
+                 (recentf-add-file new-name)
+                 (recentf-remove-if-non-kept filename))
                (when (projectile-project-p)
                  (call-interactively #'projectile-invalidate-cache))
-               (message "File '%s' successfully renamed to '%s'" name (file-name-nondirectory new-name))))))))
+               (message "File '%s' successfully renamed to '%s'" short-name (file-name-nondirectory new-name)))))))
 
-(defun bmacs/delete-file (filename &optional ask-user)
-  "Remove specified file or directory.
+  (defun bmacs/rename-current-buffer-file ()
+    "Renames current buffer and file it is visiting."
+    (interactive)
+    (let* ((name (buffer-name))
+          (filename (buffer-file-name)))
+      (if (not (and filename (file-exists-p filename)))
+          (error "Buffer '%s' is not visiting a file!" name)
+        (let* ((dir (file-name-directory filename))
+               (new-name (read-file-name "New name: " dir)))
+          (cond ((get-buffer new-name)
+                 (error "A buffer named '%s' already exists!" new-name))
+                (t
+                 (let ((dir (file-name-directory new-name)))
+                   (when (and (not (file-exists-p dir)) (yes-or-no-p (format "Create directory '%s'?" dir)))
+                     (make-directory dir t)))
+                 (rename-file filename new-name 1)
+                 (rename-buffer new-name)
+                 (set-visited-file-name new-name)
+                 (set-buffer-modified-p nil)
+                 (when (fboundp 'recentf-add-file)
+                     (recentf-add-file new-name)
+                     (recentf-remove-if-non-kept filename))
+                 (when (projectile-project-p)
+                   (call-interactively #'projectile-invalidate-cache))
+                 (message "File '%s' successfully renamed to '%s'" name (file-name-nondirectory new-name))))))))
 
-Also kills associated buffer (if any exists) and invalidates
-projectile cache when it's possible.
+  (defun bmacs/delete-file (filename &optional ask-user)
+    "Remove specified file or directory.
 
-When ASK-USER is non-nil, user will be asked to confirm file
-removal."
-  (interactive "f")
-  (when (and filename (file-exists-p filename))
-    (let ((buffer (find-buffer-visiting filename)))
-      (when buffer
-        (kill-buffer buffer)))
-    (when (or (not ask-user)
-              (yes-or-no-p "Are you sure you want to delete this file? "))
-      (delete-file filename)
-      (when (projectile-project-p)
-        (call-interactively #'projectile-invalidate-cache)))))
+  Also kills associated buffer (if any exists) and invalidates
+  projectile cache when it's possible.
 
-(defun bmacs/delete-file-confirm (filename)
-  "Remove specified file or directory after users approval.
-
-FILENAME is deleted using `bmacs/delete-file' function.."
-  (interactive "f")
-  (funcall-interactively #'bmacs/delete-file filename t))
-
-(defun bmacs/delete-current-buffer-file ()
-  "Removes file connected to current buffer and kills buffer."
-  (interactive)
-  (let ((filename (buffer-file-name))
-        (buffer (current-buffer))
-        (name (buffer-name)))
-    (if (not (and filename (file-exists-p filename)))
-        (ido-kill-buffer)
-      (when (yes-or-no-p "Are you sure you want to delete this file? ")
-        (delete-file filename t)
-        (kill-buffer buffer)
+  When ASK-USER is non-nil, user will be asked to confirm file
+  removal."
+    (interactive "f")
+    (when (and filename (file-exists-p filename))
+      (let ((buffer (find-buffer-visiting filename)))
+        (when buffer
+          (kill-buffer buffer)))
+      (when (or (not ask-user)
+                (yes-or-no-p "Are you sure you want to delete this file? "))
+        (delete-file filename)
         (when (projectile-project-p)
-          (call-interactively #'projectile-invalidate-cache))
-        (message "File '%s' successfully removed" filename)))))
+          (call-interactively #'projectile-invalidate-cache)))))
 
-(defun bmacs/sudo-edit (&optional arg)
-  (interactive "P")
-  (let ((fname (if (or arg (not buffer-file-name))
-                   (read-file-name "File: ")
-                 buffer-file-name)))
-    (find-file
-     (cond ((string-match-p "^/ssh:" fname)
-            (with-temp-buffer
-              (insert fname)
-              (search-backward ":")
-              (let ((last-match-end nil)
-                    (last-ssh-hostname nil))
-                (while (string-match "@\\\([^:|]+\\\)" fname last-match-end)
-                  (setq last-ssh-hostname (or (match-string 1 fname)
-                                              last-ssh-hostname))
-                  (setq last-match-end (match-end 0)))
-                (insert (format "|sudo:%s" (or last-ssh-hostname "localhost"))))
-              (buffer-string)))
-           (t (concat "/sudo:root@localhost:" fname))))))
+  (defun bmacs/delete-file-confirm (filename)
+    "Remove specified file or directory after users approval.
 
-(defun bmacs/show-and-copy-buffer-filename ()
-  "Show and copy the full path to the current file in the minibuffer."
-  (interactive)
-  ;; list-buffers-directory is the variable set in dired buffers
-  (let ((file-name (or (buffer-file-name) list-buffers-directory)))
-    (if file-name
-        (progn
-          (kill-new file-name)
-          (message file-name))
-      (error "Buffer not visiting a file"))))
+  FILENAME is deleted using `bmacs/delete-file' function.."
+    (interactive "f")
+    (funcall-interactively #'bmacs/delete-file filename t))
 
-(defun bmacs/alternate-buffer (&optional window)
-  "Switch back and forth between current and last buffer in the
-current window."
-  (interactive)
-  (let ((current-buffer (window-buffer window))
-        (buffer-predicate
-         (frame-parameter (window-frame window) 'buffer-predicate)))
-    ;; switch to first buffer previously shown in this window that matches
-    ;; frame-parameter `buffer-predicate'
-    (switch-to-buffer
-     (or (cl-find-if (lambda (buffer)
-                       (and (not (eq buffer current-buffer))
-                            (or (null buffer-predicate)
-                                (funcall buffer-predicate buffer))))
-                     (mapcar #'car (window-prev-buffers window)))
-         ;; `other-buffer' honors `buffer-predicate' so no need to filter
-         (other-buffer current-buffer t)))))
+  (defun bmacs/delete-current-buffer-file ()
+    "Removes file connected to current buffer and kills buffer."
+    (interactive)
+    (let ((filename (buffer-file-name))
+          (buffer (current-buffer))
+          (name (buffer-name)))
+      (if (not (and filename (file-exists-p filename)))
+          (ido-kill-buffer)
+        (when (yes-or-no-p "Are you sure you want to delete this file? ")
+          (delete-file filename t)
+          (kill-buffer buffer)
+          (when (projectile-project-p)
+            (call-interactively #'projectile-invalidate-cache))
+          (message "File '%s' successfully removed" filename)))))
 
-(defun bmacs/toggle-fold ()
-  (interactive)
-  (save-excursion
-    (end-of-line)
-    (hs-toggle-hiding)))
+  (defun bmacs/sudo-edit (&optional arg)
+    (interactive "P")
+    (let ((fname (if (or arg (not buffer-file-name))
+                     (read-file-name "File: ")
+                   buffer-file-name)))
+      (find-file
+       (cond ((string-match-p "^/ssh:" fname)
+              (with-temp-buffer
+                (insert fname)
+                (search-backward ":")
+                (let ((last-match-end nil)
+                      (last-ssh-hostname nil))
+                  (while (string-match "@\\\([^:|]+\\\)" fname last-match-end)
+                    (setq last-ssh-hostname (or (match-string 1 fname)
+                                                last-ssh-hostname))
+                    (setq last-match-end (match-end 0)))
+                  (insert (format "|sudo:%s" (or last-ssh-hostname "localhost"))))
+                (buffer-string)))
+             (t (concat "/sudo:root@localhost:" fname))))))
 
-(defun bmacs/toggle-whitespace ()
-  (interactive)
-  (if (and (boundp 'whitespace-mode) whitespace-mode)
-      (whitespace-mode -1)
-    (whitespace-mode +1)))
+  (defun bmacs/show-and-copy-buffer-filename ()
+    "Show and copy the full path to the current file in the minibuffer."
+    (interactive)
+    ;; list-buffers-directory is the variable set in dired buffers
+    (let ((file-name (or (buffer-file-name) list-buffers-directory)))
+      (if file-name
+          (progn
+            (kill-new file-name)
+            (message file-name))
+        (error "Buffer not visiting a file"))))
 
-(defun bmacs/sudo-find-file (file)
-  "Open a file as root."
-  (interactive
-   (list (read-file-name "Open as root: ")))
-  (find-file (if (file-writable-p file)
-                 file
-               (concat "/sudo:root@localhost:" file))))
+  ;; (defun bmacs/alternate-buffer (&optional window)
+  ;;   "Switch back and forth between current and last buffer in the
+  ;; current window."
+  ;;   (interactive)
+  ;;   (let ((current-buffer (window-buffer window))
+  ;;         (buffer-predicate
+  ;;          (frame-parameter (window-frame window) 'buffer-predicate)))
+  ;;     ;; switch to first buffer previously shown in this window that matches
+  ;;     ;; frame-parameter `buffer-predicate'
+  ;;     (switch-to-buffer
+  ;;      (or (cl-find-if (lambda (buffer)
+  ;;                        (and (not (eq buffer current-buffer))
+  ;;                             (or (null buffer-predicate)
+  ;;                                 (funcall buffer-predicate buffer))))
+  ;;                      (mapcar #'car (window-prev-buffers window)))
+  ;;          ;; `other-buffer' honors `buffer-predicate' so no need to filter
+  ;;          (other-buffer current-buffer t)))))
 
-(defun bmacs/sudo-this-file ()
-  "Open the current file as root."
-  (interactive)
-  (bmacs/sudo-find-file (file-truename buffer-file-name)))
+  ;; TODO: make better ... not window specific
+  (defun bmacs/alternate-buffer ()
+    (interactive)
+    (switch-to-buffer (other-buffer (current-buffer) 1)))
+
+  (defun bmacs/toggle-fold ()
+    (interactive)
+    (save-excursion
+      (end-of-line)
+      (hs-toggle-hiding)))
+
+  (defun bmacs/toggle-whitespace ()
+    (interactive)
+    (if (and (boundp 'whitespace-mode) whitespace-mode)
+        (whitespace-mode -1)
+      (whitespace-mode +1)))
+
+  (defun bmacs/sudo-find-file (file)
+    "Open a file as root."
+    (interactive
+     (list (read-file-name "Open as root: ")))
+    (find-file (if (file-writable-p file)
+                   file
+                 (concat "/sudo:root@localhost:" file))))
+
+  (defun bmacs/sudo-this-file ()
+    "Open the current file as root."
+    (interactive)
+    (bmacs/sudo-find-file (file-truename buffer-file-name)))
 #+END_SRC
 
 *** Buffer Functions
