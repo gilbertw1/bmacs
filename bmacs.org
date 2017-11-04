@@ -17,8 +17,6 @@ This is Bryan Gilbert's personal Emacs configuration.
       auth-sources (list (expand-file-name "~/.authinfo.gpg")))
 #+END_SRC
 
-*** TODO Maybe load some info from a secret emacs file? Mail stuff here?
-
 ** Variables
 
 *** Directories
@@ -110,22 +108,12 @@ Now, we're going to disable double-buffering to prevent stuttering.
 (add-to-list 'default-frame-alist '(inhibit-double-buffering . t))
 #+END_SRC
 
-We want to store any custom set variables in a separate =custom.el= file to prevent custom variables
-from being written to our =init.el= file.
-
-#+BEGIN_SRC emacs-lisp
-(setq custom-file "~/.emacs.d/custom.el")
-(load custom-file)
-#+END_SRC
-
 *** Initialize and Add Package Sources
 
 #+BEGIN_SRC emacs-lisp
-(require 'package)
 (setq use-package-always-defer t
       use-package-verbose t
-      use-package-always-ensure t
-      use-package-minimum-reported-time 0.1)
+      use-package-minimum-reported-time 0.0)
 
 (setq quelpa-checkout-melpa-p nil
       quelpa-update-melpa-p nil
@@ -140,12 +128,24 @@ from being written to our =init.el= file.
 
 (setq quelpa-dir (expand-file-name "quelpa" bmacs-packages-dir))
 
-(unless (assoc-default "melpa" package-archives)
-  (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/") t))
-(unless (assoc-default "org" package-archives)
-  (add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t))
+(eval-when-compile
+  (require 'package)
+
+  (unless (assoc-default "melpa" package-archives)
+    (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/") t))
+  (unless (assoc-default "org" package-archives)
+    (add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t))
+
+  (package-initialize)
+  (unless (package-installed-p 'use-package)
+    (package-refresh-contents)
+    (package-install 'use-package))
+  (require 'use-package)
+  (setq use-package-always-ensure t))
+
 (eval-and-compile
-  (package-initialize))
+  (setq load-path (append load-path (directory-files package-user-dir t "^[^.]" t))))
+
 (add-to-list 'load-path "/usr/local/share/emacs/site-lisp/mu/mu4e")
 #+END_SRC
 
@@ -158,13 +158,6 @@ Install =use-package= if it isn't already installed, enable it, and turn on auto
 configured =use-package= to always defer a package by default.
 
 #+BEGIN_SRC emacs-lisp
-(unless (package-installed-p 'use-package)
-  (package-refresh-contents)
-  (package-install 'use-package))
-
-(eval-when-compile
-  (require 'use-package))
-
 (use-package auto-compile
   :demand t
   :config (auto-compile-on-load-mode))
@@ -178,12 +171,11 @@ configured =use-package= to always defer a package by default.
 (unless (require 'quelpa nil t)
   (with-temp-buffer
     (url-insert-file-contents "http://raw.github.com/quelpa/quelpa/master/bootstrap.el")
-    (eval-buffer)))
-
-(quelpa
+    (eval-buffer))
+  (quelpa
  '(quelpa-use-package
    :fetcher github
-   :repo "quelpa/quelpa-use-package"))
+   :repo "quelpa/quelpa-use-package")))
 (require 'quelpa-use-package)
 #+END_SRC
 
@@ -1345,7 +1337,7 @@ Awesome visual search utility
 Making everything all ivy-ed up.
 
 #+BEGIN_SRC emacs-lisp
-(use-package counsel-projectile :demand t)
+(use-package counsel-projectile)
 (use-package counsel
   :demand t
   :config
@@ -1727,7 +1719,7 @@ the new algorithm is confusing, like in python or ruby."
 Multiple cursors!
 
 #+BEGIN_SRC emacs-lisp
-(use-package evil-mc :demand t
+(use-package evil-mc ;; :demand t TODO
   :commands (evil-mc-make-cursor-here evil-mc-make-all-cursors
              evil-mc-undo-all-cursors evil-mc-pause-cursors
              evil-mc-resume-cursors evil-mc-make-and-goto-first-cursor
@@ -2339,11 +2331,9 @@ A super cool dashboard on startup!
      (propertize
       (+doom-dashboard-center
        +doom-dashboard--width
-         (format "All loaded up!"))
-       ;; (format "Loaded %d packages in %d modules in %.02fs"
-       ;;         (- (length load-path) (length doom--base-load-path))
-       ;;         (hash-table-size doom-modules)
-       ;;         (if (floatp doom-init-time) doom-init-time 0.0))) TODO
+       (format "Loaded %d packages in %.02fs."
+               (length load-path)
+               (float-time (time-subtract after-init-time before-init-time))))
       'face 'font-lock-comment-face)
      "\n"))
 
@@ -3563,239 +3553,239 @@ Functions
 
 #+BEGIN_SRC emacs-lisp
 
-(use-package org
-  :quelpa (org :fetcher git :repo "http://orgmode.org/org-mode.git"))
+ (use-package org)
+   ;; :quelpa (org :fetcher git :repo "http://orgmode.org/org-mode.git"))
 
-;; Ensure ELPA org is prioritized above built-in org.
-(when-let* ((path (locate-library "org" nil load-path)))
-  (setq load-path (delete path load-path))
-  (push (file-name-directory path) load-path))
+  ;; Ensure ELPA org is prioritized above built-in org.
+  (when-let* ((path (locate-library "org" nil load-path)))
+    (setq load-path (delete path load-path))
+    (push (file-name-directory path) load-path))
 
-(defun +borg/open-organizer ()
-  "Open the default organizer"
-  (interactive)
-  (find-file +borg-organizer))
+  (defun +borg/open-organizer ()
+    "Open the default organizer"
+    (interactive)
+    (find-file +borg-organizer))
 
-(define-minor-mode +org-pretty-mode
-  "TODO"
-  :init-value nil
-  :lighter " *"
-  :group 'evil-org
-  (setq org-hide-emphasis-markers +org-pretty-mode)
-  (org-toggle-pretty-entities)
-  (org-with-silent-modifications
-   ;; In case the above un-align tables
-   (org-table-map-tables 'org-table-align t)))
+  (define-minor-mode +org-pretty-mode
+    "TODO"
+    :init-value nil
+    :lighter " *"
+    :group 'evil-org
+    (setq org-hide-emphasis-markers +org-pretty-mode)
+    (org-toggle-pretty-entities)
+    (org-with-silent-modifications
+     ;; In case the above un-align tables
+     (org-table-map-tables 'org-table-align t)))
 
-(defun +borg|realign-table-maybe ()
-  "Auto-align table under cursor and re-calculate formulas."
-  (when (org-at-table-p)
-    (save-excursion
-      (quiet! (org-table-recalculate)))))
+  (defun +borg|realign-table-maybe ()
+    "Auto-align table under cursor and re-calculate formulas."
+    (when (org-at-table-p)
+      (save-excursion
+        (quiet! (org-table-recalculate)))))
 
-(defun +borg|update-cookies ()
-  "Update counts in headlines (aka \"cookies\")."
-  (when (and buffer-file-name (file-exists-p buffer-file-name))
-    (org-update-statistics-cookies t)))
+  (defun +borg|update-cookies ()
+    "Update counts in headlines (aka \"cookies\")."
+    (when (and buffer-file-name (file-exists-p buffer-file-name))
+      (org-update-statistics-cookies t)))
 
- (defun +borg/dwim-at-point ()
-  "Do-what-I-mean at point. This includes following timestamp links, aligning
-tables, toggling checkboxes/todos, executing babel blocks, previewing latex
-fragments, opening links, or refreshing images."
-  (interactive)
-  (let* ((scroll-pt (window-start))
-         (context (org-element-context))
-         (type (org-element-type context)))
-    (cond
-     ((memq type '(planning timestamp))
-      (org-follow-timestamp-link))
+   (defun +borg/dwim-at-point ()
+    "Do-what-I-mean at point. This includes following timestamp links, aligning
+  tables, toggling checkboxes/todos, executing babel blocks, previewing latex
+  fragments, opening links, or refreshing images."
+    (interactive)
+    (let* ((scroll-pt (window-start))
+           (context (org-element-context))
+           (type (org-element-type context)))
+      (cond
+       ((memq type '(planning timestamp))
+        (org-follow-timestamp-link))
 
-     ((memq type '(table table-row))
-      (if (org-element-property :tblfm (org-element-property :parent context))
-          (org-table-recalculate t)
-        (org-table-align)))
+       ((memq type '(table table-row))
+        (if (org-element-property :tblfm (org-element-property :parent context))
+            (org-table-recalculate t)
+          (org-table-align)))
 
-     ((org-element-property :checkbox (org-element-lineage context '(item) t))
-      (let ((match (and (org-at-item-checkbox-p) (match-string 1))))
-        (org-toggle-checkbox (if (equal match "[ ]") '(16)))))
+       ((org-element-property :checkbox (org-element-lineage context '(item) t))
+        (let ((match (and (org-at-item-checkbox-p) (match-string 1))))
+          (org-toggle-checkbox (if (equal match "[ ]") '(16)))))
 
-     ((and (eq type 'headline)
-           (string= "ARCHIVE" (car-safe (org-get-tags))))
-      (org-force-cycle-archived))
+       ((and (eq type 'headline)
+             (string= "ARCHIVE" (car-safe (org-get-tags))))
+        (org-force-cycle-archived))
 
-     ((eq type 'headline)
-      (org-todo
-       (cond
-        ((eq (org-element-property :todo-type context) 'done) 'none)
-        ((eq (org-element-property :todo-type context) 'todo) 'done)
-        (t 'todo))))
+       ((eq type 'headline)
+        (org-todo
+         (cond
+          ((eq (org-element-property :todo-type context) 'done) 'none)
+          ((eq (org-element-property :todo-type context) 'todo) 'done)
+          (t 'todo))))
 
-     ((org-element-property :bullet (org-element-lineage context '(item) t))
-      (+borg/toggle-checkbox))
+       ((org-element-property :bullet (org-element-lineage context '(item) t))
+        (+borg/toggle-checkbox))
 
-     ((eq type 'babel-call)
-      (org-babel-lob-execute-maybe))
+       ((eq type 'babel-call)
+        (org-babel-lob-execute-maybe))
 
-     ((memq type '(src-block inline-src-block))
-      (org-babel-execute-src-block))
+       ((memq type '(src-block inline-src-block))
+        (org-babel-execute-src-block))
 
-     ((memq type '(latex-fragment latex-environment))
-      (org-toggle-latex-fragment))
+       ((memq type '(latex-fragment latex-environment))
+        (org-toggle-latex-fragment))
 
-     ((eq type 'link)
-      (let ((path (org-element-property :path (org-element-lineage context '(link) t))))
-        (if (and path (image-type-from-file-name path))
-            (+borg/refresh-inline-images)
-          (org-open-at-point))))
+       ((eq type 'link)
+        (let ((path (org-element-property :path (org-element-lineage context '(link) t))))
+          (if (and path (image-type-from-file-name path))
+              (+borg/refresh-inline-images)
+            (org-open-at-point))))
 
-     (t (+borg/refresh-inline-images)))
-    (set-window-start nil scroll-pt)))
+       (t (+borg/refresh-inline-images)))
+      (set-window-start nil scroll-pt)))
 
-(defun +borg/indent ()
-  "Indent the current item (header or item). Otherwise, forward to
-`self-insert-command'."
-  (interactive)
-  (cond ((org-at-item-p)
-         (org-indent-item-tree))
-        ((org-at-heading-p)
-         (ignore-errors (org-demote)))
-        ((org-in-src-block-p t)
-         (doom/dumb-indent)) ; TODO dumb-indent
-        (t
-         (call-interactively #'self-insert-command))))
+  (defun +borg/indent ()
+    "Indent the current item (header or item). Otherwise, forward to
+  `self-insert-command'."
+    (interactive)
+    (cond ((org-at-item-p)
+           (org-indent-item-tree))
+          ((org-at-heading-p)
+           (ignore-errors (org-demote)))
+          ((org-in-src-block-p t)
+           (doom/dumb-indent)) ; TODO dumb-indent
+          (t
+           (call-interactively #'self-insert-command))))
 
-(defun +borg/indent-or-next-field-or-yas-expand ()
-  "Depending on the context either a) indent the current line, b) go the next
-table field or c) run `yas-expand'."
-  (interactive)
-  (call-interactively
-   (cond ((and (bound-and-true-p yas-minor-mode)
-               (yas--templates-for-key-at-point))
-          #'yas-expand)
-         ((org-at-table-p)
-          #'org-table-next-field)
-         (t
-          #'+borg/indent))))
+  (defun +borg/indent-or-next-field-or-yas-expand ()
+    "Depending on the context either a) indent the current line, b) go the next
+  table field or c) run `yas-expand'."
+    (interactive)
+    (call-interactively
+     (cond ((and (bound-and-true-p yas-minor-mode)
+                 (yas--templates-for-key-at-point))
+            #'yas-expand)
+           ((org-at-table-p)
+            #'org-table-next-field)
+           (t
+            #'+borg/indent))))
 
-(defun +borg/dedent ()
-  "Dedent the current item (header or item). Otherwise, forward to
-`self-insert-command'."
-  (interactive)
-  (cond ((org-at-item-p)
-         (org-list-indent-item-generic
-          -1 nil
-          (save-excursion
-            (when (org-region-active-p)
-              (goto-char (region-beginning)))
-            (org-list-struct))))
-        ((org-at-heading-p)
-         (ignore-errors (org-promote)))
-        (t
-         (call-interactively #'self-insert-command))))
+  (defun +borg/dedent ()
+    "Dedent the current item (header or item). Otherwise, forward to
+  `self-insert-command'."
+    (interactive)
+    (cond ((org-at-item-p)
+           (org-list-indent-item-generic
+            -1 nil
+            (save-excursion
+              (when (org-region-active-p)
+                (goto-char (region-beginning)))
+              (org-list-struct))))
+          ((org-at-heading-p)
+           (ignore-errors (org-promote)))
+          (t
+           (call-interactively #'self-insert-command))))
 
-(defun +borg/dedent-or-prev-field ()
-  "Depending on the context either dedent the current item or go the previous
-table field."
-  (interactive)
-  (call-interactively
-   (if (org-at-table-p)
-       #'org-table-previous-field
-     #'+borg/dedent)))
+  (defun +borg/dedent-or-prev-field ()
+    "Depending on the context either dedent the current item or go the previous
+  table field."
+    (interactive)
+    (call-interactively
+     (if (org-at-table-p)
+         #'org-table-previous-field
+       #'+borg/dedent)))
 
-(defun +borg/insert-item (direction)
-  "Inserts a new heading, table cell or item, depending on the context.
-DIRECTION can be 'above or 'below.
+  (defun +borg/insert-item (direction)
+    "Inserts a new heading, table cell or item, depending on the context.
+  DIRECTION can be 'above or 'below.
 
-I use this instead of `org-insert-item' or `org-insert-heading' which are too
-opinionated and perform this simple task incorrectly (e.g. whitespace in the
-wrong places)."
-  (interactive)
-  (let* ((context (org-element-lineage
-                   (org-element-context)
-                   '(table table-row headline inlinetask item plain-list)
-                   t))
-         (type (org-element-type context)))
-    (cond ((eq type 'item)
-           (let ((marker (org-element-property :bullet context))
-                 (pad (save-excursion
-                        (back-to-indentation)
-                        (- (point) (line-beginning-position)))))
-             (pcase direction
-               ('below
-                (goto-char (line-end-position))
-                (insert (concat  "\n" (make-string pad ? ) marker)))
-               ('above
-                (goto-char (line-beginning-position))
-                (insert (make-string pad ? ) marker)
-                (save-excursion (insert "\n")))))
-           (when (org-element-property :checkbox context)
-             (insert "[ ] ")))
-
-          ((memq type '(table table-row))
-           (pcase direction
-             ('below (org-table-insert-row t))
-             ('above (+borg/table-prepend-row-or-shift-up))))
-
-          ((memq type '(headline inlinetask plain-list))
-           (let* ((subcontext (org-element-context))
-                  (level (save-excursion
-                           (org-back-to-heading)
-                           (org-element-property
-                            :level
-                            (if (eq (org-element-type subcontext) 'headline)
-                                subcontext
-                              1)))))
-             (pcase direction
-               ('below
-                (let ((at-eol (= (point) (1- (line-end-position)))))
+  I use this instead of `org-insert-item' or `org-insert-heading' which are too
+  opinionated and perform this simple task incorrectly (e.g. whitespace in the
+  wrong places)."
+    (interactive)
+    (let* ((context (org-element-lineage
+                     (org-element-context)
+                     '(table table-row headline inlinetask item plain-list)
+                     t))
+           (type (org-element-type context)))
+      (cond ((eq type 'item)
+             (let ((marker (org-element-property :bullet context))
+                   (pad (save-excursion
+                          (back-to-indentation)
+                          (- (point) (line-beginning-position)))))
+               (pcase direction
+                 ('below
                   (goto-char (line-end-position))
-                  (org-end-of-subtree)
-                  (insert (concat "\n"
-                                  (when (= level 1)
-                                    (if at-eol
-                                        (ignore (cl-incf level))
-                                      "\n"))
-                                  (make-string level ?*)
-                                  " "))))
-               ('above
-                (org-back-to-heading)
-                (org-insert-heading)
-                (when (= level 1)
-                  (save-excursion (evil-open-above 1))
+                  (insert (concat  "\n" (make-string pad ? ) marker)))
+                 ('above
+                  (goto-char (line-beginning-position))
+                  (insert (make-string pad ? ) marker)
                   (save-excursion (insert "\n")))))
-             (when (org-element-property :todo-type context)
-               (org-todo 'todo))))
+             (when (org-element-property :checkbox context)
+               (insert "[ ] ")))
 
-          (t (user-error "Not a valid list, heading or table")))
+            ((memq type '(table table-row))
+             (pcase direction
+               ('below (org-table-insert-row t))
+               ('above (+borg/table-prepend-row-or-shift-up))))
 
-    (when (bound-and-true-p evil-mode)
-      (evil-append-line 1))))
+            ((memq type '(headline inlinetask plain-list))
+             (let* ((subcontext (org-element-context))
+                    (level (save-excursion
+                             (org-back-to-heading)
+                             (org-element-property
+                              :level
+                              (if (eq (org-element-type subcontext) 'headline)
+                                  subcontext
+                                1)))))
+               (pcase direction
+                 ('below
+                  (let ((at-eol (= (point) (1- (line-end-position)))))
+                    (goto-char (line-end-position))
+                    (org-end-of-subtree)
+                    (insert (concat "\n"
+                                    (when (= level 1)
+                                      (if at-eol
+                                          (ignore (cl-incf level))
+                                        "\n"))
+                                    (make-string level ?*)
+                                    " "))))
+                 ('above
+                  (org-back-to-heading)
+                  (org-insert-heading)
+                  (when (= level 1)
+                    (save-excursion (evil-open-above 1))
+                    (save-excursion (insert "\n")))))
+               (when (org-element-property :todo-type context)
+                 (org-todo 'todo))))
 
-(defun +org-get-property (name &optional _file) ; TODO Add FILE
-  "Get a propery from an org file."
-  (save-excursion
-    (goto-char 1)
-    (re-search-forward (format "^#\\+%s:[ \t]*\\([^\n]+\\)" (upcase name)) nil t)
-    (buffer-substring-no-properties (match-beginning 1) (match-end 1))))
+            (t (user-error "Not a valid list, heading or table")))
 
-(defun +borg/refresh-inline-images ()
-  "Refresh image previews in the current heading/tree."
-  (interactive)
-  (if (> (length org-inline-image-overlays) 0)
-      (org-remove-inline-images)
-    (org-display-inline-images
-     t t
-     (if (org-before-first-heading-p)
-         (line-beginning-position)
-       (save-excursion (org-back-to-heading) (point)))
-     (if (org-before-first-heading-p)
-         (line-end-position)
-       (save-excursion (org-end-of-subtree) (point))))))
+      (when (bound-and-true-p evil-mode)
+        (evil-append-line 1))))
 
-(defun +borg/toggle-checkbox ()
-  "Toggle the presence of a checkbox in the current item."
-  (interactive)
-  (org-toggle-checkbox '(4)))
+  (defun +org-get-property (name &optional _file) ; TODO Add FILE
+    "Get a propery from an org file."
+    (save-excursion
+      (goto-char 1)
+      (re-search-forward (format "^#\\+%s:[ \t]*\\([^\n]+\\)" (upcase name)) nil t)
+      (buffer-substring-no-properties (match-beginning 1) (match-end 1))))
+
+  (defun +borg/refresh-inline-images ()
+    "Refresh image previews in the current heading/tree."
+    (interactive)
+    (if (> (length org-inline-image-overlays) 0)
+        (org-remove-inline-images)
+      (org-display-inline-images
+       t t
+       (if (org-before-first-heading-p)
+           (line-beginning-position)
+         (save-excursion (org-back-to-heading) (point)))
+       (if (org-before-first-heading-p)
+           (line-end-position)
+         (save-excursion (org-end-of-subtree) (point))))))
+
+  (defun +borg/toggle-checkbox ()
+    "Toggle the presence of a checkbox in the current item."
+    (interactive)
+    (org-toggle-checkbox '(4)))
 #+END_SRC
 
 Configuration
@@ -3816,11 +3806,10 @@ Configuration
 ;; The standard unicode characters are usually misaligned depending on the font.
 ;; This bugs me. Personally, markdown #-marks for headlines are more elegant, so
 ;; we use those.
-(use-package org-bullets
-  :quelpa (org-bullets :fetcher github :repo "hlissner/org-bullets")
-  :commands org-bullets-mode
-  :init (add-hook 'org-mode-hook #'org-bullets-mode))
-
+  (use-package org-bullets
+    ;;:quelpa (org-bullets :fetcher github :repo "hlissner/org-bullets")
+    :commands org-bullets-mode
+    :init (add-hook 'org-mode-hook #'org-bullets-mode))
 
 (defun +borg|hook ()
   "Run everytime `org-mode' is enabled."
@@ -3903,17 +3892,7 @@ Configuration
    org-todo-keywords '((sequence "TODO(t)" "IN-PROGRESS(i)" "WAITING(w)" "|" "DONE(d)" "CANCELED(c)"))
    org-use-sub-superscripts '{}
    outline-blank-line t
-   org-log-done 'time
-
-   ;; LaTeX previews are too small and usually render to light backgrounds, so
-   ;; this enlargens them and ensures their background (and foreground) match the
-   ;; current theme.
-   org-format-latex-options (plist-put org-format-latex-options :scale 1.5)
-   org-format-latex-options
-   (plist-put org-format-latex-options
-              :background (face-attribute (or (cadr (assq 'default face-remapping-alist))
-                                              'default)
-                                          :background nil t)))
+   org-log-done 'time)
 
   ;; Use ivy/helm if either is available
     (setq-default org-completion-use-ido nil
