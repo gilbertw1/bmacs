@@ -10,10 +10,20 @@ Install
 
     git clone git@github.com:gilbertw1/bmacs-new.git ~/.emacs.d
 
-Run
+Run (May need to restart once or twice before packages finish installing on initial run)
 
     emacs
 
-Byte Compile (after initial run)
+### Scripts
 
-    ./compile.sh
+Clean: Delete compiled files
+
+    ./scripts/clean.sh
+
+Byte Compile: Compile configuration for performace (Recompile required after to load new config changes)
+
+    ./scripts/compile.sh
+
+Update Packages
+
+    ./scripts/update.sh

@@ -111,42 +111,43 @@ Now, we're going to disable double-buffering to prevent stuttering.
 *** Initialize and Add Package Sources
 
 #+BEGIN_SRC emacs-lisp
-(setq use-package-always-defer t
-      use-package-verbose t
-      use-package-minimum-reported-time 0.0)
+  (setq use-package-always-defer t
+        use-package-verbose t
+        use-package-minimum-reported-time 0.0)
 
-(setq quelpa-checkout-melpa-p nil
-      quelpa-update-melpa-p nil
-      quelpa-melpa-recipe-stores nil
-      quelpa-self-upgrade-p nil)
+  (setq quelpa-checkout-melpa-p nil
+        quelpa-update-melpa-p nil
+        quelpa-melpa-recipe-stores nil
+        quelpa-self-upgrade-p nil)
 
-(eval-and-compile
-  (setq package-user-dir (expand-file-name "elpa" bmacs-packages-dir)))
+  (eval-and-compile
+    (setq package-user-dir (expand-file-name "elpa" bmacs-packages-dir)))
 
-(setq load-prefer-newer t
-      package-enable-at-startup nil)
+  (setq load-prefer-newer t
+        package--init-file-ensured t
+        package-enable-at-startup nil)
 
-(setq quelpa-dir (expand-file-name "quelpa" bmacs-packages-dir))
+  (setq quelpa-dir (expand-file-name "quelpa" bmacs-packages-dir))
 
-(eval-when-compile
-  (require 'package)
+  (eval-when-compile
+    (require 'package)
 
-  (unless (assoc-default "melpa" package-archives)
-    (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/") t))
-  (unless (assoc-default "org" package-archives)
-    (add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t))
+    (unless (assoc-default "melpa" package-archives)
+      (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/") t))
+    (unless (assoc-default "org" package-archives)
+      (add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t))
 
-  (package-initialize)
-  (unless (package-installed-p 'use-package)
-    (package-refresh-contents)
-    (package-install 'use-package))
-  (require 'use-package)
-  (setq use-package-always-ensure t))
+    (package-initialize)
+    (unless (package-installed-p 'use-package)
+      (package-refresh-contents)
+      (package-install 'use-package))
+    (require 'use-package)
+    (setq use-package-always-ensure t))
 
-(eval-and-compile
-  (setq load-path (append load-path (directory-files package-user-dir t "^[^.]" t))))
+   (eval-and-compile
+     (setq load-path (append load-path (directory-files package-user-dir t "^[^.]" t))))
 
-(add-to-list 'load-path "/usr/local/share/emacs/site-lisp/mu/mu4e")
+  (add-to-list 'load-path "/usr/local/share/emacs/site-lisp/mu/mu4e")
 #+END_SRC
 
 Use =M-x package-refresh-contents= to reload the list of packages
@@ -165,18 +166,19 @@ configured =use-package= to always defer a package by default.
 
 
 *** Setup Quelpa
+Not currently using quelpa, so not enabled.
 
 #+BEGIN_SRC emacs-lisp
-(setq quelpa-update-melpa-p nil)
-(unless (require 'quelpa nil t)
-  (with-temp-buffer
-    (url-insert-file-contents "http://raw.github.com/quelpa/quelpa/master/bootstrap.el")
-    (eval-buffer))
-  (quelpa
- '(quelpa-use-package
-   :fetcher github
-   :repo "quelpa/quelpa-use-package")))
-(require 'quelpa-use-package)
+  ;; (setq quelpa-update-melpa-p nil)
+  ;; (unless (require 'quelpa nil t)
+  ;;   (with-temp-buffer
+  ;;     (url-insert-file-contents "http://raw.github.com/quelpa/quelpa/master/bootstrap.el")
+  ;;     (eval-buffer))
+  ;;   (quelpa
+  ;;  '(quelpa-use-package
+  ;;    :fetcher github
+  ;;    :repo "quelpa/quelpa-use-package")))
+  ;; (require 'quelpa-use-package)
 #+END_SRC
 
 ** Macros
@@ -615,6 +617,12 @@ TODO - Sort these out better
  ;; files
  abbrev-file-name             (concat bmacs-local-dir "abbrev.el")
  auto-save-list-file-name     (concat bmacs-cache-dir "autosave"))
+#+END_SRC
+
+**** Pcache File Location
+
+#+BEGIN_SRC emacs-lisp
+(setq pcache-directory (concat bmacs-cache-dir "pcache"))
 #+END_SRC
 
 *** Libraries
@@ -2107,13 +2115,13 @@ Vi like tilde's in the fringe for past EOF
   (load-theme 'doom-one t)
 
   ;; improve integration with org-mode
-  (add-hook 'doom-init-ui-hook #'doom-themes-org-config)
+  (add-hook 'bmacs-post-init-hook #'doom-themes-org-config)
 
   ;; blink mode-line on errors
-  (add-hook 'doom-init-ui-hook #'doom-themes-visual-bell-config)
+  (add-hook 'bmacs-post-init-hook #'doom-themes-visual-bell-config)
 
   ;; Add file icons to doom-neotree
-  (add-hook 'doom-init-ui-hook #'doom-themes-neotree-config)
+  (add-hook 'bmacs-post-init-hook #'doom-themes-neotree-config)
   (setq doom-neotree-enable-variable-pitch t
         doom-neotree-file-icons 'simple
         doom-neotree-line-spacing 2))
@@ -3395,6 +3403,16 @@ If we're not using Emacs 26+ we need nlinum to support line numbers.
     (advice-add #'set-frame-font :after #'nlinum-hl-flush-all-windows))
 #+END_SRC
 
+*** winner-mode
+Windowing operations (mostly undo/redo)
+
+#+BEGIN_SRC emacs-lisp
+(defvar winner-dont-bind-my-keys t) ; I'll bind keys myself
+(autoload 'winner-mode "winner" nil t)
+(add-hook 'bmacs-post-init-hook #'winner-mode)
+
+#+END_SRC
+
 ** Project
 
 *** projectile
@@ -3554,7 +3572,6 @@ Functions
 #+BEGIN_SRC emacs-lisp
 
  (use-package org)
-   ;; :quelpa (org :fetcher git :repo "http://orgmode.org/org-mode.git"))
 
   ;; Ensure ELPA org is prioritized above built-in org.
   (when-let* ((path (locate-library "org" nil load-path)))
@@ -3807,7 +3824,6 @@ Configuration
 ;; This bugs me. Personally, markdown #-marks for headlines are more elegant, so
 ;; we use those.
   (use-package org-bullets
-    ;;:quelpa (org-bullets :fetcher github :repo "hlissner/org-bullets")
     :commands org-bullets-mode
     :init (add-hook 'org-mode-hook #'org-bullets-mode))
 
