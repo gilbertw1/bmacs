@@ -14,9 +14,11 @@ $$$$$$$  |$$ | \_/ $$ |$$ |  $$ |\$$$$$$  |\$$$$$$  |
 BMACS
 =====
 
-Bryan's Emacs. This is my personal emacs configuration written as a literate org file.
+Bryan's Emacs. This is my personal emacs configuration written as a literate org file. It has been
+optimized to be run graphically on Arch Linux using Emacs 26+.
 
-It is heavily influenced by and would not exist without the fantastic [DOOM Emacs configuration](https://github.com/hlissner/doom-emacs).
+It is heavily influenced by and would not exist without the fantastic
+[DOOM Emacs configuration](https://github.com/hlissner/doom-emacs). 
 
 
 ### Usage

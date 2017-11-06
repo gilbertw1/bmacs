@@ -1,7 +1,6 @@
 #+TITLE: BMACS
 #+AUTHOR: Bryan Gilbert
 #+PROPERTY: header-args :tangle yes
-#+OPTIONS: toc:4 h:4
 
 * Configuration
 :PROPERTIES:
@@ -981,7 +980,7 @@ Enable line numbers
  ;; Save clipboard contents into kill-ring before replacing them
  save-interprogram-paste-before-kill t
  ;; Bookmarks
- bookmark-default-file (concat bmacs-cache-dir "bookmarks")
+ bookmark-default-file (concat bmacs-etc-dir "bookmarks")
  bookmark-save-flag t
  ;; Formatting
  delete-trailing-lines nil
@@ -1019,6 +1018,8 @@ Enable line numbers
 (setq auto-revert-verbose nil)
 
 (show-paren-mode)
+
+(push '("/LICENSE$" . text-mode) auto-mode-alist)
 #+END_SRC
 
 **** TODO Break apart?
@@ -1766,7 +1767,7 @@ Allows for creation of isolated workspaces
         persp-auto-save-fname "autosave"
         persp-auto-resume-time 1
         persp-auto-save-opt 1
-        persp-save-dir (concat bmacs-cache-dir "workspaces/"))
+        persp-save-dir (concat bmacs-etc-dir "workspaces/"))
 
   (defun +workspaces*track-last-persp (switch-fun &rest args)
     (let ((before-persp (safe-persp-name (get-current-persp)))
@@ -3673,7 +3674,7 @@ If STRICT-P, return nil if no project was found, otherwise return
 (use-package recentf
   :demand t
   :config
-  (setq recentf-save-file (concat bmacs-cache-dir "recentf")
+  (setq recentf-save-file (concat bmacs-etc-dir "recentf")
       recentf-max-menu-items 0
       recentf-max-saved-items 300)
   (recentf-mode))
@@ -4981,7 +4982,7 @@ A terminal by Emacs for Emacs!
 (use-package eshell ; built-in
   :commands eshell-mode
   :init
-  (setq eshell-directory-name (concat bmacs-cache-dir "/eshell")
+  (setq eshell-directory-name (concat bmacs-etc-dir "/eshell")
         eshell-scroll-to-bottom-on-input 'all
         eshell-scroll-to-bottom-on-output 'all
         eshell-buffer-shorthand t
@@ -5739,6 +5740,8 @@ Python? Lisp? WTF?
 
   (use-package meghanada
     :commands meghanada-mode
+    :init
+    (add-hook! 'java-mode-hook #'(meghanada-mode rainbow-delimiters-mode))
     :config
     (setq meghanada-server-install-dir (concat bmacs-etc-dir "meghanada-server/")
           meghanada-use-company t
@@ -5746,12 +5749,10 @@ Python? Lisp? WTF?
           meghanada-use-eldoc t
           meghanada-use-auto-start nil)
 
-    (add-hook 'java-mode-hook #'(rainbow-delimiters-mode eldoc-mode))
-
     ;; Setup on first use
     (meghanada-install-server)
     (if (file-exists-p (meghanada--locate-server-jar))
-        (add-hook! 'java-mode-hook #'(meghanada-mode flycheck-mode))
+        (add-hook! 'meghanada-mode-hook #'(flycheck-mode eldoc-mode))
       (warn "java-mode: meghanada-server not installed, java-mode will run with reduced functionality")))
 
   (use-package android-mode
@@ -6309,7 +6310,7 @@ Ghetto shell scripting
       (while
           (and (setq res
                      (re-search-forward
-                      "\\(\\$\\)\\({.+?}\\|\\<.+?\\>\\)"
+                      "[^\\]\\(\\$\\)\\({.+?}\\|\\<[a-zA-Z0-9_]+\\|[@*#!]\\)"
                       limit t))
                (not (eq (nth 3 (syntax-ppss)) ?\"))))
       res)))
@@ -6321,7 +6322,7 @@ Ghetto shell scripting
     (let (res)
       (while
           (and (setq res
-                     (re-search-forward "\\(\\$(.+?)\\|`.+?`\\)"
+                     (re-search-forward "[^\\]\\(\\$(.+?)\\|`.+?`\\)"
                                         limit t))
                (not (eq (nth 3 (syntax-ppss)) ?\"))))
       res)))
@@ -6341,17 +6342,22 @@ Ghetto shell scripting
   ;(set! :electric 'sh-mode :words '("else" "elif" "fi" "done" "then" "do" "esac" ";;")) TODO
   (setq sh-indent-after-continuation 'always)
 
+  ;; recognize function names with dashes in them
+  (push '((sh . ((nil "^\\s-*function\\s-+\\([[:alpha:]_-][[:alnum:]_-]*\\)\\s-*\\(?:()\\)?" 1)
+                 (nil "^\\s-*\\([[:alpha:]_-][[:alnum:]_-]*\\)\\s-*()" 1))))
+        sh-imenu-generic-expression)
+
   ;; 1. Fontifies variables in double quotes
   ;; 2. Fontify command substitution in double quotes
   ;; 3. Fontify built-in/common commands (see `+sh-builtin-keywords')
   (font-lock-add-keywords
    'sh-mode `((+sh--match-variables-in-quotes
-               (1 'default prepend)
+               (1 'font-lock-constant-face prepend)
                (2 'font-lock-variable-name-face prepend))
               (+sh--match-command-subst-in-quotes
-               (0 'sh-quoted-exec prepend))
-              (,(concat "^\\s-*" (regexp-opt +sh-builtin-keywords 'words))
-               (0 'font-lock-builtin-face t))))
+               (1 'sh-quoted-exec prepend))
+              (,(regexp-opt +sh-builtin-keywords 'words)
+               (0 'font-lock-type-face append))))
 
   ;; autoclose backticks
   (sp-local-pair 'sh-mode "`" nil :unless '(sp-point-before-word-p sp-point-before-same-p))
