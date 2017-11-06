@@ -72,7 +72,8 @@
     - [[#gist][gist]]
     - [[#git-timemachine][git-timemachine]]
     - [[#git-link][git-link]]
-    - [[#evil-magit---todo-do-i-still-want-this-experiment-with-default-keybinds][evil-magit - TODO: do I still want this, experiment with default keybinds]]
+    - [[#evil-magit][evil-magit]]
+    - [[#magithub][magithub]]
   - [[#ui-1][UI]]
     - [[#all-the-icons][all-the-icons]]
     - [[#vi-tilde-fringe][vi-tilde-fringe]]
@@ -232,12 +233,12 @@ different types of files.
   problems.")
 
   (defvar bmacs-packages-dir (concat bmacs-local-dir "packages/")
-    "Where package.el and quelpa plugins (and their caches) are stored."))
+    "Where package.el and quelpa plugins (and their caches) are stored.")
 
 
-(dolist (dir (list bmacs-local-dir bmacs-etc-dir bmacs-cache-dir (expand-file-name "elpa" bmacs-packages-dir)))
-  (unless (file-directory-p dir)
-    (make-directory dir t)))
+  (dolist (dir (list bmacs-local-dir bmacs-etc-dir bmacs-cache-dir (expand-file-name "elpa" bmacs-packages-dir)))
+    (unless (file-directory-p dir)
+      (make-directory dir t))))
 #+END_SRC
 
 *** Hooks
@@ -2272,12 +2273,23 @@ repository root."
       (git-link (git-link--select-remote) beg end))))
 #+END_SRC
 
-*** evil-magit - TODO: do I still want this, experiment with default keybinds
+*** evil-magit 
 
 #+BEGIN_SRC emacs-lisp
 (use-package evil-magit
   :after magit
   :init (setq evil-magit-want-horizontal-movement t))
+#+END_SRC
+
+*** magithub
+
+#+BEGIN_SRC emacs-lisp
+(use-package magithub
+  :ensure t
+  :after magit
+  :config
+  (magithub-feature-autoinject t)
+  (load "magithub-issue-view.el"))
 #+END_SRC
 
 ** UI
