@@ -7,6 +7,7 @@
 * Configuration
 
 ** About this file
+
 This is Bryan Gilbert's personal Emacs configuration.
 
 ** Personal Information
@@ -18,6 +19,19 @@ This is Bryan Gilbert's personal Emacs configuration.
 #+END_SRC
 
 ** Variables
+
+*** Leader Keys
+
+Define the leader and local leader keys. These are the basis of most custom global and mode specific
+keybindings.
+
+#+BEGIN_SRC emacs-lisp
+  (defvar bmacs-leader-key "SPC"
+    "The leader prefix key, for global commands.")
+
+  (defvar bmacs-localleader-key "SPC m"
+    "The localleader prefix key, for major-mode specific commands.")
+#+END_SRC
 
 *** Directories
 
@@ -68,6 +82,7 @@ different types of files.
 #+END_SRC
 
 ** Security Settings
+Properly verify outgoing ssl connections.
 
 #+BEGIN_SRC emacs-lisp
 (setq gnutls-verify-error t
@@ -110,25 +125,52 @@ Now, we're going to disable double-buffering to prevent stuttering.
 
 *** Initialize and Add Package Sources
 
+Tell =use-package= to always defer loading packages unless explicitly told otherwise. This speeds up
+initialization significantly as many packages are only loaded later when they are explicitly used.
+
 #+BEGIN_SRC emacs-lisp
   (setq use-package-always-defer t
-        use-package-verbose t
-        use-package-minimum-reported-time 0.0)
+        use-package-verbose t)
+#+END_SRC
 
-  (setq quelpa-checkout-melpa-p nil
-        quelpa-update-melpa-p nil
-        quelpa-melpa-recipe-stores nil
-        quelpa-self-upgrade-p nil)
+We're using a custom directory to store our packages so we need to set =package-user-dir= to the
+location we wan them stored. We're the =load-path= ourselves and avoid calling =(package-initilize)=
+(for performance reasons) so we need to set =package--init-file-ensured= to tell =package.el= to
+not automatically call it on our behalf. Additionally we're setting =package-enable-at-startup= so
+that packages will not automatically be loaded for us since =use-package= will be handling that.
 
+
+#+BEGIN_SRC emacs-lisp
   (eval-and-compile
     (setq package-user-dir (expand-file-name "elpa" bmacs-packages-dir)))
 
   (setq load-prefer-newer t
         package--init-file-ensured t
         package-enable-at-startup nil)
+#+END_SRC
 
-  (setq quelpa-dir (expand-file-name "quelpa" bmacs-packages-dir))
+We're going to set the load path ourselves so that we don't have to call =package-initialize= at
+runtime and incur a large performance hit.
 
+#+BEGIN_SRC emacs-lisp
+   (eval-and-compile
+     (setq load-path (append load-path (directory-files package-user-dir t "^[^.]" t))))
+#+END_SRC
+
+Next we are going to require =package.el= and add our additional package archives, 'melpa' and 'org'.
+Afterwards we need to initialize our packages and then ensure that =use-package= is installed, which
+we promptly install if it's missing. Finally we load =use-package= and tell it to always install any
+missing packages.
+
+Note that this entire block is wrapped in =eval-when-compile=. The effect of this is to perform all
+of the package initialization during compilation so that when byte compiled, all of this time consuming
+code is skipped. This can be done because the result of byte compiling =use-package= statements results
+in the macro being fully expanded at which point =use-package= isn't actually required any longer.
+
+Since the code is automatically compiled during runtime, if the configuration hasn't already been
+previously compiled manually then all of the package initialization will still take place at startup.
+
+#+BEGIN_SRC emacs-lisp
   (eval-when-compile
     (require 'package)
 
@@ -143,20 +185,17 @@ Now, we're going to disable double-buffering to prevent stuttering.
       (package-install 'use-package))
     (require 'use-package)
     (setq use-package-always-ensure t))
+#+END_SRC
 
-   (eval-and-compile
-     (setq load-path (append load-path (directory-files package-user-dir t "^[^.]" t))))
+Add the package directory =mu4e= to the load path.
 
+#+BEGIN_SRC emacs-lisp
   (add-to-list 'load-path "/usr/local/share/emacs/site-lisp/mu/mu4e")
 #+END_SRC
 
-Use =M-x package-refresh-contents= to reload the list of packages
-after adding these for the first time.
+*** Setup auto compilation
 
-*** Setup Use-Package
-
-Install =use-package= if it isn't already installed, enable it, and turn on auto-compiling. Also,
-configured =use-package= to always defer a package by default.
+Auto compile any non-compiled lisp file before it is loaded.
 
 #+BEGIN_SRC emacs-lisp
 (use-package auto-compile
@@ -166,9 +205,17 @@ configured =use-package= to always defer a package by default.
 
 
 *** Setup Quelpa
+
 Not currently using quelpa, so not enabled.
 
 #+BEGIN_SRC emacs-lisp
+
+  ;; (setq quelpa-checkout-melpa-p nil
+  ;;       quelpa-update-melpa-p nil
+  ;;       quelpa-melpa-recipe-stores nil
+  ;;       quelpa-self-upgrade-p nil
+  ;;       quelpa-dir (expand-file-name "quelpa" bmacs-packages-dir))
+
   ;; (setq quelpa-update-melpa-p nil)
   ;; (unless (require 'quelpa nil t)
   ;;   (with-temp-buffer
@@ -181,7 +228,11 @@ Not currently using quelpa, so not enabled.
   ;; (require 'quelpa-use-package)
 #+END_SRC
 
-** Macros
+** DOOM! Macros
+
+A set of fantastic macros written by [[https://github.com/hlissner][hlissner]]. There won't be much
+documentation around these because the comments for each macro does a great job explaining their
+function.
 
 *** after!
 
@@ -200,7 +251,6 @@ compilation."
 #+END_SRC
 
 *** map!
-An amazing keybinding macro written by hlissner
 
 #+BEGIN_SRC emacs-lisp
 (eval-and-compile
@@ -213,12 +263,6 @@ An amazing keybinding macro written by hlissner
     (while (memq (car-safe exp) '(quote function))
       (setq exp (cadr exp)))
     exp)
-
-  (defvar bmacs-leader-key "SPC"
-    "The leader prefix key, for global commands.")
-
-  (defvar bmacs-localleader-key "SPC m"
-    "The localleader prefix key, for major-mode specific commands.")
 
   (defvar bmacs-evil-state-alist
     '((?n . normal)
@@ -577,7 +621,7 @@ have the same meaning as in `defun'."
 
 #+END_SRC
 
-** General Configuration
+** Core Settings
 
 *** Core
 
