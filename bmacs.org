@@ -28,6 +28,7 @@
     - [[#add-hook][add-hook!]]
     - [[#quiet][quiet!]]
     - [[#def-memoized][def-memoized!]]
+    - [[#λ][λ!]]
   - [[#core-settings][Core Settings]]
     - [[#core][Core]]
     - [[#libraries][Libraries]]
@@ -800,6 +801,16 @@ have the same meaning as in `defun'."
      (defun ,name ,arglist ,@body)
      (doom-memoize ',name)))
 
+
+#+END_SRC
+
+*** λ!
+
+#+BEGIN_SRC emacs-lisp
+(defmacro λ! (&rest body)
+  "A shortcut for inline interactive lambdas."
+  (declare (doc-string 1))
+  `(lambda () (interactive) ,@body))
 
 #+END_SRC
 
@@ -2287,6 +2298,8 @@ repository root."
 (use-package magithub
   :ensure t
   :after magit
+  :init
+  (setq magithub-dir (concat bmacs-cache-dir "magithub"))
   :config
   (magithub-feature-autoinject t)
   (load "magithub-issue-view.el"))
@@ -7326,12 +7339,12 @@ session)."
      "C-g"           #'company-abort
      [tab]           #'company-complete-common-or-cycle
      [backtab]       #'company-select-previous
-     [escape]        (lambda () (company-abort) (evil-normal-state 1)))
+     [escape]        (λ! (company-abort) (evil-normal-state 1)))
    ;; Automatically applies to `company-filter-map'
    (:map company-search-map
      "C-j"        #'company-search-repeat-forward
      "C-k"        #'company-search-repeat-backward
-     "C-s"        (lambda () (company-search-abort) (company-filter-candidates))
+     "C-s"        (λ! (company-search-abort) (company-filter-candidates))
      [escape]     #'company-search-abort))
 
  ;; counsel
@@ -7351,7 +7364,7 @@ session)."
  (:after evil-snipe
    ;; Binding to switch to evil-easymotion/avy after a snipe
    (:map evil-snipe-parent-transient-map
-     "C-;" (lambda () (require 'evil-easymotion)
+     "C-;" (λ! (require 'evil-easymotion)
                (call-interactively +evil--snipe-repeat-fn))))
 
  ;; avy goto char

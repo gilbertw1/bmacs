@@ -1,3 +1,3 @@
 #!/bin/sh
 
-rm bmacs.el bmacs.elc
+rm -f ~/.emacs.d/bmacs.el ~/.emacs.d/bmacs.elc
