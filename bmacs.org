@@ -16,6 +16,7 @@
     - [[#leader-keys][Leader Keys]]
     - [[#directories][Directories]]
     - [[#hooks][Hooks]]
+    - [[#misc][Misc]]
   - [[#security-settings][Security Settings]]
   - [[#emacs-initialization][Emacs Initialization]]
     - [[#initialization-settings][Initialization Settings]]
@@ -148,11 +149,16 @@
     - [[#swift][Swift]]
     - [[#typescript][Typescript]]
     - [[#web][Web]]
-  - [[#misc][Misc]]
+  - [[#misc-1][Misc]]
     - [[#hydra][hydra]]
     - [[#command-log-mode][command-log-mode]]
     - [[#help-fns][help-fns+]]
     - [[#pcre2el][pcre2el]]
+  - [[#popup-rules][Popup Rules]]
+    - [[#help][Help]]
+    - [[#restclient-1][Restclient]]
+    - [[#eshell-1][Eshell]]
+    - [[#flycheck-1][Flycheck]]
   - [[#functions][Functions]]
     - [[#file-functions][File Functions]]
     - [[#buffer-functions][Buffer Functions]]
@@ -241,6 +247,13 @@ different types of files.
 (defvar bmacs-post-init-hook nil
   "A list of hooks run after BMACS initialization is complete, and after
 `bmacs-init-hook'.")
+#+END_SRC
+
+*** Misc
+
+#+BEGIN_SRC emacs-lisp
+(defvar bmacs-escapable-popups '()
+  "A list of popup matchers that determine if a popup can be escaped")
 #+END_SRC
 
 ** Security Settings
@@ -1559,7 +1572,6 @@ Making everything all ivy-ed up.
   (setq counsel-find-file-ignore-regexp "\\(?:^[#.]\\)\\|\\(?:[#~]$\\)\\|\\(?:^Icon?\\)")
 
   ;; Configure `counsel-rg', `counsel-ag' & `counsel-pt'
-  ;(set! :popup 'ivy-occur-grep-mode :size (+ 2 ivy-height) :regexp t :autokill t) TODO
   (dolist (cmd '(counsel-ag counsel-rg counsel-pt))
     (ivy-add-actions
      cmd
@@ -2147,8 +2159,6 @@ Check syntax!
   ;; Emacs feels snappier without checks on idle/change
   (setq flycheck-check-syntax-automatically '(save mode-enabled))
 
-  ;(set! :popup 'flycheck-error-list-mode :select t :autokill t) TODO
-
   (after! evil
     ;; Flycheck buffer on ESC in normal mode.
     (defun +syntax-checkers|flycheck-buffer ()
@@ -2204,9 +2214,6 @@ Check syntax!
   (add-hook 'text-mode #'+version-control|git-gutter-maybe)
   (add-hook 'prog-mode #'+version-control|git-gutter-maybe)
   (add-hook 'conf-mode #'+version-control|git-gutter-maybe)
-    ;; :config
-    ;; (set! :popup "^\\*git-gutter.+\\*$" :regexp t :size 15 :noselect t) TODO
-    ;; TODO - take git gutter hydra??
   :config
   ;; Update git-gutter on focus (in case I was using git externally)
   (add-hook 'focus-in-hook #'git-gutter:update-all-windows)
@@ -2331,14 +2338,6 @@ Vi like tilde's in the fringe for past EOF
   (setq doom-neotree-enable-variable-pitch t
         doom-neotree-file-icons 'simple
         doom-neotree-line-spacing 2))
-
-  ; TODO
-  ; (after! neotree
-  ;   (defun +doom|neotree-fix-popup ()
-  ;     "Ensure the fringe settings are maintained on popup restore."
-  ;     (neo-global--when-window
-  ;      (doom--neotree-no-fringes)))
-  ;   (add-hook 'doom-popup-mode-hook #'+doom|neotree-fix-popup)))
 
 (after! hideshow
   (defface +doom-folded-face
@@ -4814,7 +4813,6 @@ Configuration
   :commands restclient-mode
   :mode ("\\.\\(http\\|rest\\)$" . restclient-mode)
   :config
-  ;;(set! :popup "*HTTP Response*" :size 30 :select t :noesc t :autokill t) TODO
   (map! :mode restclient-mode
         :n [M-return] 'restclient-http-send-current
         :localleader
@@ -4902,6 +4900,9 @@ Directories in Emacs
 A terminal by Emacs for Emacs!
 
 #+BEGIN_SRC emacs-lisp
+(defun +eshell--outside-prompt-p ()
+  (< (point) eshell-last-output-end))
+
 (defun +eshell/evil-append ()
   (interactive)
   (goto-char eshell-last-output-end)
@@ -4948,6 +4949,22 @@ A terminal by Emacs for Emacs!
     (goto-char eshell-last-output-end))
   (call-interactively #'evil-change-line))
 
+(defun +eshell/popup ()
+  (interactive)
+  (let ((eshell-window (get-buffer-window "*eshell*")))
+    (if eshell-window
+      (delete-window eshell-window)
+      (eshell))))
+
+(defun +eshell/project-popup ()
+  (interactive)
+  (let ((eshell-window (get-buffer-window "*eshell-project*")))
+    (if eshell-window
+      (delete-window eshell-window)
+      (let ((eshell-buffer-name "*eshell-project*")
+            (eshell-directory-name (bmacs-project-root)))
+        (eshell)))))
+
 (defun +eshell-prompt ()
   (concat (propertize (abbreviate-file-name (eshell/pwd)) 'face 'eshell-prompt)
           (propertize (+eshell--current-git-branch) 'face 'font-lock-function-name-face)
@@ -4960,8 +4977,6 @@ A terminal by Emacs for Emacs!
     (if (not (eq branch nil))
         (concat " [" (substring branch 2) "]")
       "")))
-
-
 
 (use-package eshell ; built-in
   :commands eshell-mode
@@ -5034,6 +5049,7 @@ redefines its keys every time `eshell-mode' is enabled."
           ("g"   "hub")
           ("gs"  "hub status --short ."))))
 
+  (add-to-list 'bmacs-escapable-popups (rx bos "*eshell*" eos))
 #+END_SRC
 
 *** Imenu
@@ -5156,7 +5172,8 @@ TODO - I really have no idea
   (when (bound-and-true-p winner-mode)
     (push neo-buffer-name winner-boring-buffers))
 
-  ;; BMACS - Hide neotree on enter file
+  (add-hook '+evil-esc-hook #'neotree-hide)
+
   (defvar +neotree/neotree-opening-file nil)
   (defvar +neotree/neotree-entering-dired nil)
   (add-hook 'neo-enter-hook #'+neotree/neo-hide-on-enter)
@@ -5607,17 +5624,6 @@ The language that runs on the Emacs interpreter
     ;; `evil-normalize-keymaps' seems to be required for macrostep or it won't
     ;; apply for the very first invocation
     (add-hook 'macrostep-mode-hook #'evil-normalize-keymaps))
-
-  (use-package flycheck-cask
-    :commands flycheck-cask-setup
-    :init
-    (add-hook! 'emacs-lisp-hook
-      (add-hook 'flycheck-mode-hook #'flycheck-cask-setup nil t)))
-
-  (use-package overseer
-    :commands overseer-test)
-    ;; :init
-    ;; (set! :popup '("*overseer*" :size 12)))
 #+END_SRC
 
 *** Go
@@ -5685,8 +5691,6 @@ Lazy lazy functional programming
   (custom-set-variables '(company-ghc-show-info t))
 
   (autoload 'switch-to-haskell "inf-haskell" nil t))
-  ; (after! inf-haskell
-  ;   (map! :map inferior-haskell-mode-map "ESC ESC" #'doom/popup-close))) ; TODO
 
 (use-package ghc
   :commands (ghc-init ghc-debug))
@@ -6607,7 +6611,6 @@ Log commands to buffer
 (use-package command-log-mode
   :commands (command-log-mode global-command-log-mode)
   :config
-  ;(set! :popup "*command-log*" :size 40 :align 'right :noselect t) TODO
   (setq command-log-mode-auto-show t
         command-log-mode-open-log-turns-on-mode t))
 #+END_SRC
@@ -6623,6 +6626,64 @@ Improved help commands
 
 
 *** TODO pcre2el
+
+** Popup Rules
+
+*** Help
+
+#+BEGIN_SRC emacs-lisp
+  (setq help-window-select t)
+  (add-to-list 'display-buffer-alist
+             `(,(rx bos "*Help*" eos)
+               (display-buffer-in-side-window)
+               (reusable-frames . visible)
+               (side            . bottom)
+               (window-height   . 0.4)))
+#+END_SRC
+
+*** Restclient
+
+#+BEGIN_SRC emacs-lisp
+  (add-to-list 'display-buffer-alist
+             `(,(rx bos "*HTTP Response*" eos)
+               (display-buffer-in-side-window)
+               (reusable-frames . visible)
+               (side            . bottom)
+               (window-height   . 0.4)))
+#+END_SRC
+
+*** Eshell
+
+#+BEGIN_SRC emacs-lisp
+  (add-to-list 'display-buffer-alist
+             `(,(rx bos "*eshell*" eos)
+               (display-buffer-reuse-window
+                display-buffer-in-side-window)
+               (reusable-frames . visible)
+               (side            . bottom)
+               (window-height   . 0.4)))
+
+  (add-to-list 'display-buffer-alist
+             `(,(rx bos "*eshell-project*" eos)
+               (display-buffer-reuse-window
+                display-buffer-in-side-window)
+               (reusable-frames . visible)
+               (side            . bottom)
+               (window-height   . 0.4)))
+#+END_SRC
+
+*** Flycheck
+
+#+BEGIN_SRC emacs-lisp
+(add-to-list 'display-buffer-alist
+             `(,(rx bos "*Flycheck errors*" eos)
+               (display-buffer-reuse-window
+                display-buffer-in-side-window)
+               (reusable-frames . visible)
+               (side            . bottom)
+               (window-height   . 0.4)))
+#+END_SRC
+
 
 ** Functions
 
@@ -6983,7 +7044,7 @@ session)."
     :desc "Switch to last buffer"            :nv "TAB" #'bmacs/alternate-buffer
     :desc "Ace window"                       :nv "W" #'ace-window
     :desc "Pop terminal"                     :nv "'" #'+term/open-popup
-    :desc "Pop eshell"                       :nv "`" #'+eshell/open-popup
+    :desc "Pop eshell"                       :nv "`" #'+eshell/popup
 
     (:desc "file"
       :prefix "f"
@@ -7043,6 +7104,7 @@ session)."
       :desc "Invalidate cache"              :nv "I" #'projectile-invalidate-cache
       :desc "List project tasks"            :nv "a" #'+ivy/tasks
       :desc "Pop term in project root"      :nv "'" #'+term/open-popup-in-project
+      :desc "Pop eshell in project root"    :nv "`" #'+eshell/project-popup
       :desc "Project specific bookmarks"    :nv "b" #'counsel-projectile-bookmark)
 
     (:desc "search"
