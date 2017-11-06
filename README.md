@@ -1,3 +1,16 @@
+```
+$$$$$$$\  $$\      $$\  $$$$$$\   $$$$$$\   $$$$$$\  
+$$  __$$\ $$$\    $$$ |$$  __$$\ $$  __$$\ $$  __$$\ 
+$$ |  $$ |$$$$\  $$$$ |$$ /  $$ |$$ /  \__|$$ /  \__|
+$$$$$$$\ |$$\$$\$$ $$ |$$$$$$$$ |$$ |      \$$$$$$\  
+$$  __$$\ $$ \$$$  $$ |$$  __$$ |$$ |       \____$$\ 
+$$ |  $$ |$$ |\$  /$$ |$$ |  $$ |$$ |  $$\ $$\   $$ |
+$$$$$$$  |$$ | \_/ $$ |$$ |  $$ |\$$$$$$  |\$$$$$$  |
+\_______/ \__|     \__|\__|  \__| \______/  \______/ 
+```
+
+- - -
+
 BMACS
 =====
 
@@ -20,7 +33,7 @@ Clean: Delete compiled files
 
     ./scripts/clean.sh
 
-Byte Compile: Compile configuration for performace (Recompile required after to load new config changes)
+Byte Compile: Compile configuration for performace (Recompile required when new changes are made)
 
     ./scripts/compile.sh
 
