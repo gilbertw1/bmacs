@@ -3805,7 +3805,7 @@ Functions
  (use-package org)
 
   ;; Ensure ELPA org is prioritized above built-in org.
-  (when-let* ((path (locate-library "org" nil load-path)))
+  (when-let ((path (locate-library "org" nil load-path)))
     (setq load-path (delete path load-path))
     (push (file-name-directory path) load-path))
 
@@ -7046,7 +7046,7 @@ session)."
  "M-x"    #'execute-extended-command
  "M-;"    #'eval-expression
  ;; Tools
- ;"C-`"    #'doom/popup-toggle ; TODO
+ ;"C-`"    #'doom/popup-toggle ; TODO?
  ;; Text-scaling
  "M-0"    (λ! (text-scale-set 0))
  "M-="    #'text-scale-increase
