@@ -2,9 +2,11 @@
 #+AUTHOR: Bryan Gilbert
 #+PROPERTY: header-args :tangle yes
 #+OPTIONS: toc:4 h:4
-#+STARTUP: showeverything
 
 * Configuration
+:PROPERTIES:
+:VISIBILITY: children
+:END:
 
 ** Table of Contents :TOC_3_gh:
 - [[#configuration][Configuration]]
