@@ -14,7 +14,9 @@ $$$$$$$  |$$ | \_/ $$ |$$ |  $$ |\$$$$$$  |\$$$$$$  |
 BMACS
 =====
 
-Bryan's emacs (heavily influenced by and borrows from the amazing DOOM configuration by hlissner)
+Bryan's Emacs. This is my personal emacs configuration written as a literate org file.
+
+It is heavily influenced by and would not exist without the fantastic [DOOM Emacs configuration](https://github.com/hlissner/doom-emacs).
 
 
 ### Usage
