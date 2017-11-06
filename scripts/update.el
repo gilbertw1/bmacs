@@ -22,14 +22,14 @@
           (push (cadr (assq package package-archive-contents))
                 upgrades)))))
   (when upgrades
-    (princ (format "Upgrading %d package%s"
+    (princ (format "\nUpgraded %d package%s\n"
                    (length upgrades)
                    (if (= (length upgrades) 1) "" "s")))
     (save-window-excursion
       (dolist (package-desc upgrades)
-        (princ (format "  - %s" (package-desc-full-name package-desc)))
+        (princ (format "  - %s\n" (package-desc-full-name package-desc)))
         (let ((old-package (cadr (assq (package-desc-name package-desc)
                                        package-alist))))
           (package-install package-desc)
           (package-delete  old-package)))))
-  (princ "All packages are up to date"))
+  (princ "All packages are up to date\n"))

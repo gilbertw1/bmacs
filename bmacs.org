@@ -185,11 +185,12 @@ Define the leader and local leader keys. These are the basis of most custom glob
 keybindings.
 
 #+BEGIN_SRC emacs-lisp
+(eval-and-compile
   (defvar bmacs-leader-key "SPC"
     "The leader prefix key, for global commands.")
 
   (defvar bmacs-localleader-key "SPC m"
-    "The localleader prefix key, for major-mode specific commands.")
+    "The localleader prefix key, for major-mode specific commands."))
 #+END_SRC
 
 *** Directories
@@ -282,6 +283,12 @@ Now, we're going to disable double-buffering to prevent stuttering.
 (add-to-list 'default-frame-alist '(inhibit-double-buffering . t))
 #+END_SRC
 
+Disable certain byte compiler warnings to cut down on the noise.
+
+#+BEGIN_SRC emacs-lisp
+(setq byte-compile-warnings '(not free-vars unresolved noruntime lexical make-local))
+#+END_SRC
+
 *** Initialize and Add Package Sources
 
 Tell =use-package= to always defer loading packages unless explicitly told otherwise. This speeds up
@@ -349,7 +356,8 @@ previously compiled manually then all of the package initialization will still t
 Add the package directory =mu4e= to the load path.
 
 #+BEGIN_SRC emacs-lisp
-  (add-to-list 'load-path "/usr/local/share/emacs/site-lisp/mu/mu4e")
+  (eval-and-compile
+    (add-to-list 'load-path "/usr/share/emacs/site-lisp/mu4e"))
 #+END_SRC
 
 *** Setup auto compilation
@@ -835,6 +843,7 @@ TODO - Sort these out better
 (use-package s :demand t)
 (use-package f :demand t)
 (use-package subr-x :demand t :ensure nil)
+(require 'cl-lib)
 
 #+END_SRC
 
@@ -1213,10 +1222,11 @@ They power and the glory! Generic complete anything frontend
         [remap describe-variable]         #'counsel-describe-variable
         [remap describe-face]             #'counsel-describe-face)
 
-  (defsubst +ivy--icon-for-mode (mode)
-    "Apply `all-the-icons-for-mode' on MODE but either return an icon or nil."
-    (let ((icon (all-the-icons-icon-for-mode mode)))
-      (unless (symbolp icon) icon)))
+  (eval-and-compile
+    (defsubst +ivy--icon-for-mode (mode)
+      "Apply `all-the-icons-for-mode' on MODE but either return an icon or nil."
+      (let ((icon (all-the-icons-icon-for-mode mode)))
+        (unless (symbolp icon) icon))))
 
   (defun +ivy-buffer-transformer (str)
     (let* ((buf (get-buffer str))
@@ -1430,19 +1440,16 @@ I like to prevent evil from yanking text to the clipboard in many scenarios.
     (evil-delete beg end type reg)
     (evil-delete beg end type ?_)))
 
-;;;###autoload (autoload 'evil-delete-backward-char-without-register "feature/evil/autoload/evil" nil t)
 (evil-define-operator evil-delete-backward-char-without-register (beg end type _)
   "delete backward character without yanking"
   :motion evil-backward-char
   (interactive "<R><y>")
   (evil-delete beg end type ?_))
 
-;;;###autoload (autoload 'evil-delete-without-register "feature/evil/autoload/evil" nil t)
-(evil-define-operator evil-delete-without-register (beg end type _ _)
+(evil-define-operator evil-delete-without-register (beg end type _ _2)
   (interactive "<R><y>")
   (evil-delete beg end type ?_))
 
-;;;###autoload (autoload 'evil-delete-without-register-if-whitespace "feature/evil/autoload/evil" nil t)
 (evil-define-operator evil-delete-without-register-if-whitespace (beg end type reg yank-handler)
   (interactive "<R><y>")
   (let ((text (replace-regexp-in-string "\n" "" (filter-buffer-substring beg end))))
@@ -1450,24 +1457,20 @@ I like to prevent evil from yanking text to the clipboard in many scenarios.
       (evil-delete beg end type ?_)
       (evil-delete beg end type reg yank-handler))))
 
-;;;###autoload (autoload 'evil-delete-line-without-register "feature/evil/autoload/evil" nil t)
 (evil-define-operator evil-delete-line-without-register (beg end type _ yank-handler)
     (interactive "<R><y>")
     (evil-delete-line beg end type ?_ yank-handler))
 
-;;;###autoload (autoload 'evil-change-without-register "feature/evil/autoload/evil" nil t)
 (evil-define-operator evil-change-without-register (beg end type _ yank-handler)
   (interactive "<R><y>")
   (evil-change beg end type ?_ yank-handler))
 
-;;;###autoload (autoload 'evil-change-line-without-register "feature/evil/autoload/evil" nil t)
 (evil-define-operator evil-change-line-without-register (beg end type _ yank-handler)
   "Change to end of line without yanking."
   :motion evil-end-of-line
   (interactive "<R><y>")
   (evil-change beg end type ?_ yank-handler #'evil-delete-line))
 
-;;;###autoload (autoload 'evil-paste-after-without-register "feature/evil/autoload/evil" nil t)
 (evil-define-command evil-paste-after-without-register (count &optional register yank-handler)
   "evil paste before without yanking"
   :suppress-operator t
@@ -1476,7 +1479,6 @@ I like to prevent evil from yanking text to the clipboard in many scenarios.
       (evil-visual-paste-without-register count register)
       (evil-paste-after count register yank-handler)))
 
-;;;###autoload (autoload 'evil-paste-before-without-register "feature/evil/autoload/evil" nil t)
 (evil-define-command evil-paste-before-without-register (count &optional register yank-handler)
   "evil paste before without yanking"
   :suppress-operator t
@@ -1485,7 +1487,6 @@ I like to prevent evil from yanking text to the clipboard in many scenarios.
       (evil-visual-paste-without-register count register)
       (evil-paste-before count register yank-handler)))
 
-;;;###autoload (autoload 'evil-visual-paste-without-register "feature/evil/autoload/evil" nil t)
 (evil-define-command evil-visual-paste-without-register (count &optional register)
   "Paste over Visual selection."
   :suppress-operator t
@@ -4194,7 +4195,7 @@ between the two."
            :n  "D"   #'org-deadline
            :n  "e"   #'org-edit-special
            :n  "E"   #'+borg/edit-special-same-window
-           :n  "i"   (lambda () (if (and (boundp 'iimage-mode) iimage-mode) (turn-off-iimage-mode) (turn-on-iimage-mode)))
+           :n  "i"   (lambda () (if (and (boundp 'iimage-mode) iimage-mode) (iimage-mode -1) (iimage-mode +1)))
            :n  "n"   (lambda () (if (buffer-narrowed-p) (widen) (org-narrow-to-subtree)))
            :n  "r"   #'org-refile
            :n  "R"   (lambda () (org-metaleft) (org-archive-to-archive-sibling)) ; archive to parent sibling
@@ -6860,7 +6861,7 @@ project."
 
   (defun projectile-bookmarks ()
     (let ((bmarks (bookmark-all-names)))
-      (remove-if-not #'workspace-bookmark-p bmarks)))
+      (cl-remove-if-not #'workspace-bookmark-p bmarks)))
 
   (defun workspace-bookmark-p (bmark)
     (let ((bmark-path (expand-file-name (bookmark-location bmark))))
