@@ -7048,7 +7048,7 @@ session)."
  ;; Tools
  ;"C-`"    #'doom/popup-toggle ; TODO
  ;; Text-scaling
- "M-0"    (lambda () (text-scale-set 0))
+ "M-0"    (λ! (text-scale-set 0))
  "M-="    #'text-scale-increase
  "M--"    #'text-scale-decrease
  ;; Temporary escape into emacs mode
@@ -7087,19 +7087,14 @@ session)."
       :desc "Delete file"                    :nv "d" #'bmacs/delete-file-confirm
       :desc "Delete current file"            :nv "D" #'bmacs/delete-current-buffer-file
       :desc "Sudo edit file"                 :nv "E" #'bmacs/sudo-edit
-      :desc "Recent files"                   :nv "r"  #'counsel-recentf
-      :desc "Neotree toggle"                 :nv "t"  #'neotree-toggle
-      :desc "Save buffer"                    :nv "s"  #'save-buffer
-      :desc "Save all buffers"               :nv "S"  #'evil-write-all
-      :desc "Counsel bookmark"               :nv "b"  #'counsel-bookmark
-      :desc "Remote"                         :nv "i"  (lambda ()
-                                                        (interactive)
-                                                        (counsel-find-file "/"))
+      :desc "Recent files"                   :nv "r" #'counsel-recentf
+      :desc "Neotree toggle"                 :nv "t" #'neotree-toggle
+      :desc "Save buffer"                    :nv "s" #'save-buffer
+      :desc "Save all buffers"               :nv "S" #'evil-write-all
+      :desc "Counsel bookmark"               :nv "b" #'counsel-bookmark
+      :desc "Remote"                         :nv "i" (λ! (counsel-find-file "/"))
       :desc "Cleanup this tramp conn"        :nv "x" #'tramp-cleanup-this-connection
-      :desc "Cleanup all tramp conns"        :nv "X" (lambda ()
-                                                       (interactive)
-                                                       (tramp-cleanup-all-buffers)
-                                                       (tramp-cleanup-all-connections))
+      :desc "Cleanup all tramp conns"        :nv "X" (λ! (tramp-cleanup-all-buffers) (tramp-cleanup-all-connections))
       :desc "Show and copy filename"         :nv "y" #'bmacs/show-and-copy-buffer-filename
       )
 
@@ -7109,9 +7104,7 @@ session)."
       :desc "Switch workspace buffer"        :nv "b" #'counsel-projectile-switch-to-buffer
       :desc "Switch buffer"                  :nv "B" #'ivy-switch-buffer
       :desc "Kill buffer"                    :nv "d" #'kill-this-buffer
-      :desc "Kill other buffers"             :nv "D" (lambda ()
-                                                       (interactive)
-                                                       (bmacs/kill-other-buffers t))
+      :desc "Kill other buffers"             :nv "D" (λ! (bmacs/kill-other-buffers t))
       :desc "Kill a buffer"                  :nv "k" #'kill-buffer
       :desc "New empty buffer"               :nv "n" #'evil-buffer-new
       ;; :desc "Scratch buffer"                 :nv "s" #'doom/open-scratch-buffer TODO
