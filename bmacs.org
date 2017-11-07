@@ -174,7 +174,7 @@
     - [[#adjust-fringe][Adjust Fringe]]
     - [[#update-faces][Update Faces]]
     - [[#mardown-open-comamnd][Mardown Open Comamnd]]
-  - [[#todos-03][Todos]]
+  - [[#todos-14][Todos]]
 
 ** About this file
 
@@ -261,7 +261,7 @@ different types of files.
 *** Misc
 
 #+BEGIN_SRC emacs-lisp
-(defvar bmacs-escapable-popups '()
+(defvar bmacs-popups '()
   "A list of popup matchers that determine if a popup can be escaped")
 #+END_SRC
 
@@ -868,6 +868,13 @@ TODO - Sort these out better
 
 #+BEGIN_SRC emacs-lisp
 (setq pcache-directory (concat bmacs-cache-dir "pcache"))
+#+END_SRC
+
+**** Warnings
+Only display error level warnings immediately to the user
+
+#+BEGIN_SRC emacs-lisp
+(setq warning-minimum-level :error)
 #+END_SRC
 
 *** Libraries
@@ -1596,7 +1603,7 @@ Making everything all ivy-ed up.
      cmd
      '(("O" +ivy-git-grep-other-window-action "open in other window"))))
 
-     
+
   (ivy-set-display-transformer #'counsel-projectile-switch-to-buffer #'+ivy-buffer-transformer)
   (ivy-set-display-transformer #'counsel-recentf #'abbreviate-file-name)
 
@@ -5086,8 +5093,6 @@ redefines its keys every time `eshell-mode' is enabled."
           ("la"  "ls -la")
           ("g"   "hub")
           ("gs"  "hub status --short ."))))
-
-  (add-to-list 'bmacs-escapable-popups (rx bos "*eshell*" eos))
 #+END_SRC
 
 *** Imenu
@@ -5389,7 +5394,7 @@ Can you hear the C? -- TODO: Pair this down to just basic C/C++ support ... too 
     (add-hook! (c-mode c++-mode objc-mode) #'irony-mode)
     :config
     (unless (file-directory-p irony-server-install-prefix)
-      (message "irony-mode: server isn't installed; run M-x irony-install-server")))
+      (warn "irony-mode: server isn't installed; run M-x irony-install-server")))
 
   (use-package irony-eldoc
     :after irony
@@ -6675,31 +6680,39 @@ Improved help commands
 *** Help
 
 #+BEGIN_SRC emacs-lisp
-  (setq help-window-select t)
+(setq help-window-select t)
+(let ((help-buffer-rx (rx bos "*Help*" eos)))
+  (add-to-list 'bmacs-popups help-buffer-rx)
   (add-to-list 'display-buffer-alist
-             `(,(rx bos "*Help*" eos)
+             `(,help-buffer-rx
                (display-buffer-in-side-window)
                (reusable-frames . visible)
                (side            . bottom)
-               (window-height   . 0.4)))
+               (window-height   . 0.4))))
 #+END_SRC
 
 *** Restclient
 
 #+BEGIN_SRC emacs-lisp
+(let ((restclient-buffer-rx (rx bos "*HTTP Response*" eos)))
+  (add-to-list 'bmacs-popups restclient-buffer-rx)
   (add-to-list 'display-buffer-alist
-             `(,(rx bos "*HTTP Response*" eos)
+             `(,restclient-buffer-rx
                (display-buffer-in-side-window)
                (reusable-frames . visible)
                (side            . bottom)
-               (window-height   . 0.4)))
+               (window-height   . 0.4))))
 #+END_SRC
 
 *** Eshell
 
 #+BEGIN_SRC emacs-lisp
+(let ((eshell-buffer-rx (rx bos "*eshell*" eos))
+      (eshell-project-buffer-rx (rx bos "*eshell-project*" eos)))
+  (add-to-list 'bmacs-popups eshell-buffer-rx)
+  (add-to-list 'bmacs-popups eshell-project-buffer-rx)
   (add-to-list 'display-buffer-alist
-             `(,(rx bos "*eshell*" eos)
+             `(,eshell-buffer-rx
                (display-buffer-reuse-window
                 display-buffer-in-side-window)
                (reusable-frames . visible)
@@ -6707,24 +6720,26 @@ Improved help commands
                (window-height   . 0.4)))
 
   (add-to-list 'display-buffer-alist
-             `(,(rx bos "*eshell-project*" eos)
+             `(,eshell-project-buffer-rx
                (display-buffer-reuse-window
                 display-buffer-in-side-window)
                (reusable-frames . visible)
                (side            . bottom)
-               (window-height   . 0.4)))
+               (window-height   . 0.4))))
 #+END_SRC
 
 *** Flycheck
 
 #+BEGIN_SRC emacs-lisp
-(add-to-list 'display-buffer-alist
-             `(,(rx bos "*Flycheck errors*" eos)
-               (display-buffer-reuse-window
-                display-buffer-in-side-window)
-               (reusable-frames . visible)
-               (side            . bottom)
-               (window-height   . 0.4)))
+(let ((flycheck-buffer-rx (rx bos "*Flycheck errors*" eos)))
+  (add-to-list 'bmacs-popups flycheck-buffer-rx)
+  (add-to-list 'display-buffer-alist
+               `(,flycheck-buffer-rx
+                 (display-buffer-reuse-window
+                  display-buffer-in-side-window)
+                 (reusable-frames . visible)
+                 (side            . bottom)
+                 (window-height   . 0.4))))
 #+END_SRC
 
 
@@ -6934,6 +6949,53 @@ project."
         (bmacs/kill-buffer-and-windows buf)))
     (when (called-interactively-p 'interactive)
       (message "Killed %s buffers" (length buffers)))))
+
+ (defun bmacs/show-hide-popup-buffer (&optional buffer-rx)
+   (interactive)
+   (let ((existing-popup-buffers
+           (if buffer-rx
+             (seq-filter
+               (lambda (buff)
+                 (string-match buffer-rx (buffer-name buff)))
+               (mapcar #'window-buffer (window-at-side-list)))
+             (seq-filter
+               (lambda (buff)
+                 (seq-some
+                   (lambda (buff-rx)
+                     (string-match buff-rx (buffer-name buff)))
+                   bmacs-popups))
+               (mapcar #'window-buffer (window-at-side-list)))))
+         (popup-buffers
+           (if buffer-rx
+             (seq-filter
+               (lambda (buff)
+                 (string-match buffer-rx (buffer-name buff)))
+               (buffer-list))
+             (seq-filter
+               (lambda (buff)
+                 (seq-some
+                   (lambda (buff-rx)
+                     (string-match buff-rx (buffer-name buff)))
+                   bmacs-popups))
+               (buffer-list)))))
+   (cond ((= 1 (length existing-popup-buffers))
+          (delete-window (get-buffer-window (car existing-popup-buffers))))
+         ((> 0 (length existing-popup-buffers))
+           (ivy-read "Open popup: "
+                 (mapcar #'buffer-name popup-buffers)
+                 :action (lambda (x)
+                           (delete-window (get-buffer-window x)))
+                 :caller 'bmacs/show-hide-popup-buffer))
+         ((seq-empty-p popup-buffers)
+          (message "No popup buffers found"))
+         ((= 1 (length popup-buffers))
+          (pop-to-buffer (car popup-buffers)))
+         (t
+          (ivy-read "Open popup: "
+                 (mapcar #'buffer-name popup-buffers)
+                 :action (lambda (x)
+                           (pop-to-buffer x))
+                 :caller 'bmacs/show-hide-popup-buffer)))))
 #+END_SRC
 
 *** Counsel Project Bookmarks
@@ -6984,21 +7046,18 @@ project."
     (when (file-exists-p git-index-lock-file)
       (delete-file git-index-lock-file))))
 
-;;;###autoload
 (defun bmacs/ace-delete-window-dispatch ()
   "Invokes ace-delete window with aw-dispatch-always temporarily set to true"
   (interactive)
   (let ((aw-dispatch-always t))
     (call-interactively #'ace-delete-window)))
 
-;;;###autoload
 (defun bmacs/file-as-string (filePath)
   "Return filePath's file content."
   (with-temp-buffer
     (insert-file-contents filePath)
     (buffer-string)))
 
-;;;###autoload
 (defun bmacs/set-limit-fill-column ()
   (interactive)
   (let ((column (string-to-number
@@ -7009,7 +7068,6 @@ project."
       (auto-fill-mode -1)
       (visual-fill-column-mode +1))))
 
-;;;###autoload
 (defun bmacs/set-limit-auto-fill-column ()
   (interactive)
   (let ((column (string-to-number
@@ -7020,7 +7078,6 @@ project."
       (auto-fill-mode +1)
       (visual-fill-column-mode +1))))
 
-;;;###autoload
 (defun bmacs/disable-all-fill-column ()
   (interactive)
   (visual-line-mode -1)
@@ -7058,7 +7115,7 @@ session)."
  "M-x"    #'execute-extended-command
  "M-;"    #'eval-expression
  ;; Tools
- ;"C-`"    #'doom/popup-toggle ; TODO?
+ "C-`"    #'bmacs/show-hide-popup-buffer
  ;; Text-scaling
  "M-0"    (λ! (text-scale-set 0))
  "M-="    #'text-scale-increase
@@ -7693,8 +7750,8 @@ Set the various indentations
 - [ ] Fix evil-mc incorrect cursor position
       When using 'C-S-j' sometimes the cursor jumps around
 
-- [ ] Hide/show any popup type with menu for mulitple popups
-
 - [ ] Implement 'surround-type' like surround function for generic types
 Uses correct syntax for known languages (maybe only implemented for those langs)
 eg. Highlight 'User' -> Press 'st' -> Type 'Seq' -> Result: Seq[User]
+
+- [ ] In command buffer map C-p/n to previous next command
