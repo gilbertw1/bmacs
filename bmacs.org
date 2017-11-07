@@ -157,6 +157,7 @@
     - [[#help-fns][help-fns+]]
     - [[#pcre2el][pcre2el]]
   - [[#popup-rules][Popup Rules]]
+    - [[#messages][Messages]]
     - [[#help][Help]]
     - [[#restclient-1][Restclient]]
     - [[#eshell-1][Eshell]]
@@ -174,7 +175,7 @@
     - [[#adjust-fringe][Adjust Fringe]]
     - [[#update-faces][Update Faces]]
     - [[#mardown-open-comamnd][Mardown Open Comamnd]]
-  - [[#todos-14][Todos]]
+  - [[#todos-03][Todos]]
 
 ** About this file
 
@@ -6677,6 +6678,19 @@ Improved help commands
 
 ** Popup Rules
 
+*** Messages
+
+#+BEGIN_SRC emacs-lisp
+(let ((messages-buffer-rx (rx bos "*Messages*" eos)))
+  (add-to-list 'bmacs-popups messages-buffer-rx)
+  (add-to-list 'display-buffer-alist
+             `(,messages-buffer-rx
+               (display-buffer-in-side-window)
+               (reusable-frames . visible)
+               (side            . bottom)
+               (window-height   . 0.4))))
+#+END_SRC
+
 *** Help
 
 #+BEGIN_SRC emacs-lisp
@@ -6950,9 +6964,13 @@ project."
     (when (called-interactively-p 'interactive)
       (message "Killed %s buffers" (length buffers)))))
 
- (defun bmacs/show-hide-popup-buffer (&optional buffer-rx)
+ (defun bmacs//get-buffer-display-time (buffer)
+   (with-current-buffer buffer
+     (float-time buffer-display-time)))
+
+ (defun bmacs/show-hide-popup-buffer (&optional select buffer-rx)
    (interactive)
-   (let ((existing-popup-buffers
+   (let ((open-popup-buffers
            (if buffer-rx
              (seq-filter
                (lambda (buff)
@@ -6965,7 +6983,7 @@ project."
                      (string-match buff-rx (buffer-name buff)))
                    bmacs-popups))
                (mapcar #'window-buffer (window-at-side-list)))))
-         (popup-buffers
+         (closed-popup-buffers
            (if buffer-rx
              (seq-filter
                (lambda (buff)
@@ -6978,21 +6996,36 @@ project."
                      (string-match buff-rx (buffer-name buff)))
                    bmacs-popups))
                (buffer-list)))))
-   (cond ((= 1 (length existing-popup-buffers))
-          (delete-window (get-buffer-window (car existing-popup-buffers))))
-         ((> 0 (length existing-popup-buffers))
-           (ivy-read "Open popup: "
-                 (mapcar #'buffer-name popup-buffers)
+   (cond ((= 1 (length open-popup-buffers))
+          (delete-window (get-buffer-window (car open-popup-buffers))))
+         ((and (> 0 (length open-popup-buffers) (not select)))
+           (delete-window
+             (get-buffer-window
+               (car
+                 (sort
+                   open-popup-buffers
+                   #'(lambda (a b)
+                     (> (bmacs//get-buffer-display-time a) (bmacs//get-buffer-display-time b))))))))
+         ((> 0 (length open-popup-buffers))
+           (ivy-read "Close popup: "
+                 (mapcar #'buffer-name open-popup-buffers)
                  :action (lambda (x)
                            (delete-window (get-buffer-window x)))
                  :caller 'bmacs/show-hide-popup-buffer))
-         ((seq-empty-p popup-buffers)
+         ((seq-empty-p closed-popup-buffers)
           (message "No popup buffers found"))
-         ((= 1 (length popup-buffers))
-          (pop-to-buffer (car popup-buffers)))
+         ((= 1 (length closed-popup-buffers))
+          (pop-to-buffer (car closed-popup-buffers)))
+         ((not select)
+           (pop-to-buffer
+             (car
+               (sort
+                 closed-popup-buffers
+                 #'(lambda (a b)
+                   (> (bmacs//get-buffer-display-time a) (bmacs//get-buffer-display-time b)))))))
          (t
           (ivy-read "Open popup: "
-                 (mapcar #'buffer-name popup-buffers)
+                 (mapcar #'buffer-name closed-popup-buffers)
                  :action (lambda (x)
                            (pop-to-buffer x))
                  :caller 'bmacs/show-hide-popup-buffer)))))
@@ -7116,6 +7149,7 @@ session)."
  "M-;"    #'eval-expression
  ;; Tools
  "C-`"    #'bmacs/show-hide-popup-buffer
+ "C-~"    (λ! (bmacs/show-hide-popup-buffer t))
  ;; Text-scaling
  "M-0"    (λ! (text-scale-set 0))
  "M-="    #'text-scale-increase
