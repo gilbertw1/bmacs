@@ -174,6 +174,7 @@
     - [[#adjust-fringe][Adjust Fringe]]
     - [[#update-faces][Update Faces]]
     - [[#mardown-open-comamnd][Mardown Open Comamnd]]
+  - [[#todos-03][Todos]]
 
 ** About this file
 
@@ -1290,8 +1291,6 @@ They power and the glory! Generic complete anything frontend
   ;; Show more buffer information in switch-buffer commands
   (ivy-set-display-transformer #'ivy-switch-buffer #'+ivy-buffer-transformer)
   (ivy-set-display-transformer #'ivy-switch-buffer-other-window #'+ivy-buffer-transformer)
-  (ivy-set-display-transformer #'counsel-projectile-switch-to-buffer #'+ivy-buffer-transformer)
-  (ivy-set-display-transformer #'counsel-recentf #'abbreviate-file-name)
 
   ;; Don't sort perp mode related lists
   (nconc ivy-sort-functions-alist
@@ -1596,6 +1595,10 @@ Making everything all ivy-ed up.
     (ivy-add-actions
      cmd
      '(("O" +ivy-git-grep-other-window-action "open in other window"))))
+
+     
+  (ivy-set-display-transformer #'counsel-projectile-switch-to-buffer #'+ivy-buffer-transformer)
+  (ivy-set-display-transformer #'counsel-recentf #'abbreviate-file-name)
 
   ;; 1. Remove character limit from `counsel-ag-function'
   ;; 2. Disable ivy's over-zealous parentheses quoting behavior (if i want
@@ -1965,66 +1968,68 @@ the new algorithm is confusing, like in python or ruby."
 Multiple cursors!
 
 #+BEGIN_SRC emacs-lisp
-(use-package evil-mc ;; :demand t TODO
-  :commands (evil-mc-make-cursor-here evil-mc-make-all-cursors
-             evil-mc-undo-all-cursors evil-mc-pause-cursors
-             evil-mc-resume-cursors evil-mc-make-and-goto-first-cursor
-             evil-mc-make-and-goto-last-cursor
-             evil-mc-make-cursor-move-next-line
-             evil-mc-make-cursor-move-prev-line evil-mc-make-cursor-at-pos
-             evil-mc-has-cursors-p evil-mc-make-and-goto-next-cursor
-             evil-mc-skip-and-goto-next-cursor evil-mc-make-and-goto-prev-cursor
-             evil-mc-skip-and-goto-prev-cursor evil-mc-make-and-goto-next-match
-             evil-mc-skip-and-goto-next-match evil-mc-skip-and-goto-next-match
-             evil-mc-make-and-goto-prev-match evil-mc-skip-and-goto-prev-match)
-  :config
-  (global-evil-mc-mode +1)
+  (use-package evil-mc ;; :demand t TODO
+    :commands (evil-mc-make-cursor-here evil-mc-make-all-cursors
+               evil-mc-undo-all-cursors evil-mc-pause-cursors
+               evil-mc-resume-cursors evil-mc-make-and-goto-first-cursor
+               evil-mc-make-and-goto-last-cursor
+               evil-mc-make-cursor-move-next-line
+               evil-mc-make-cursor-move-prev-line evil-mc-make-cursor-at-pos
+               evil-mc-has-cursors-p evil-mc-make-and-goto-next-cursor
+               evil-mc-skip-and-goto-next-cursor evil-mc-make-and-goto-prev-cursor
+               evil-mc-skip-and-goto-prev-cursor evil-mc-make-and-goto-next-match
+               evil-mc-skip-and-goto-next-match evil-mc-skip-and-goto-next-match
+               evil-mc-make-and-goto-prev-match evil-mc-skip-and-goto-prev-match)
+    :config
+    (global-evil-mc-mode +1)
 
-  (dolist
-      (commands '((evil-change-without-register . ((:default . evil-mc-execute-default-evil-change)))
-                 (evil-change-line-without-register . ((:default . evil-mc-execute-default-evil-change-line)))
-                 (evil-delete-without-register . ((:default . evil-mc-execute-default-evil-delete)))
-                 (evil-delete-without-register-if-whitespace . ((:default . evil-mc-execute-default-evil-delete)))
-                 (evil-delete-char-without-register . ((:default . evil-mc-execute-default-evil-delete)))
-                 (evil-delete-backward-char-without-register . ((:default . evil-mc-execute-default-evil-delete)))
-                 (evil-delete-line-without-register . ((:default . evil-mc-execute-default-evil-delete)))
-                 (evil-paste-after-witout-register . ((:default . evil-mc-execute-default-evil-paste)))
-                 (evil-paste-before-witout-register . ((:default . evil-mc-execute-default-evil-paste)))))
-    (push commands evil-mc-custom-known-commands))
+    (dolist
+        (commands '((evil-change-without-register . ((:default . evil-mc-execute-default-evil-change)))
+                   (evil-change-line-without-register . ((:default . evil-mc-execute-default-evil-change-line)))
+                   (evil-delete-without-register . ((:default . evil-mc-execute-default-evil-delete)))
+                   (evil-delete-without-register-if-whitespace . ((:default . evil-mc-execute-default-evil-delete)))
+                   (evil-delete-char-without-register . ((:default . evil-mc-execute-default-evil-delete)))
+                   (evil-delete-backward-char-without-register . ((:default . evil-mc-execute-default-evil-delete)))
+                   (evil-delete-line-without-register . ((:default . evil-mc-execute-default-evil-delete)))
+                   (evil-paste-after-witout-register . ((:default . evil-mc-execute-default-evil-paste)))
+                   (evil-paste-before-witout-register . ((:default . evil-mc-execute-default-evil-paste)))))
+      (push commands evil-mc-custom-known-commands))
 
-  ;; disable evil-escape in evil-mc; causes unwanted text on invocation
-  (push 'evil-escape-mode evil-mc-incompatible-minor-modes)
+    ;; disable evil-escape in evil-mc; causes unwanted text on invocation
+    (push 'evil-escape-mode evil-mc-incompatible-minor-modes)
 
-  (defun evil-mc-maybe-run-cursors-before ()
-    "Runs `evil-mc-cursors-before' if there are no cursors created yet."
-    (when (not (evil-mc-has-cursors-p))
-      (evil-mc-cursors-before)))
+    (defun evil-mc-maybe-run-cursors-before ()
+      "Runs `evil-mc-cursors-before' if there are no cursors created yet."
+      (when (not (evil-mc-has-cursors-p))
+        (evil-mc-cursors-before)))
 
-  (defun evil-mc-cursors-before ()
-    "Actions to be executed before any cursors are created."
-    (setq evil-mc-cursor-state (evil-mc-read-cursor-state nil))
-    (when (not skip)
-      (evil-mc-write-cursor-state
-       (evil-mc-put-cursor-last-position (evil-mc-get-default-cursor) (point))))
-    (run-hooks 'evil-mc-before-cursors-created))
+    (defun evil-mc-cursors-before ()
+      "Actions to be executed before any cursors are created."
+      (setq evil-mc-cursor-state (evil-mc-read-cursor-state nil))
+        (evil-mc-write-cursor-state
+         (evil-mc-put-cursor-last-position (evil-mc-get-default-cursor) (point)))
+      (run-hooks 'evil-mc-before-cursors-created))
 
-  (defun evil-mc-make-cursor-move-by-line (dir count)
-    "Create COUNT cursors one for each line moving in the direction DIR.
-  DIR should be 1 or -1 and COUNT should be a positive integer or nil."
-    (setq count (max 0 (or count 1)))
-    (dotimes (_ count)
-      (evil-mc-maybe-run-cursors-before)
-      (evil-mc-make-cursor-at-pos (point))
-      (let (line-move-visual)
-        (evil-line-move dir))))
+    (defun evil-mc-make-cursor-move-by-line (dir count)
+      "Create COUNT cursors one for each line moving in the direction DIR.
+    DIR should be 1 or -1 and COUNT should be a positive integer or nil."
+      (setq count (max 0 (or count 1)))
+      (dotimes (_ count)
+        (evil-mc-maybe-run-cursors-before)
+        (evil-mc-make-cursor-at-pos (point))
+        (if (> dir 0)
+          (evil-next-visual-line)
+          (evil-previous-visual-line))))
+        ;; (let (line-move-visual)
+        ;;   (evil-line-move dir))))
 
-  (defun +evil|escape-multiple-cursors ()
-    "Clear evil-mc cursors and restore state."
-    (when (evil-mc-has-cursors-p)
-      (evil-mc-undo-all-cursors)
-      (evil-mc-resume-cursors)
-      t))
-  (add-hook '+evil-esc-hook #'+evil|escape-multiple-cursors))
+    (defun +evil|escape-multiple-cursors ()
+      "Clear evil-mc cursors and restore state."
+      (when (evil-mc-has-cursors-p)
+        (evil-mc-undo-all-cursors)
+        (evil-mc-resume-cursors)
+        t))
+    (add-hook '+evil-esc-hook #'+evil|escape-multiple-cursors))
 #+END_SRC
 
 **** evil-snipe
@@ -5384,7 +5389,7 @@ Can you hear the C? -- TODO: Pair this down to just basic C/C++ support ... too 
     (add-hook! (c-mode c++-mode objc-mode) #'irony-mode)
     :config
     (unless (file-directory-p irony-server-install-prefix)
-      (warn "irony-mode: server isn't installed; run M-x irony-install-server")))
+      (message "irony-mode: server isn't installed; run M-x irony-install-server")))
 
   (use-package irony-eldoc
     :after irony
@@ -7681,3 +7686,15 @@ Set the various indentations
 #+BEGIN_SRC emacs-lisp
 (setq markdown-open-command "typora")
 #+END_SRC
+
+
+** Todos [0/3]
+
+- [ ] Fix evil-mc incorrect cursor position
+      When using 'C-S-j' sometimes the cursor jumps around
+
+- [ ] Hide/show any popup type with menu for mulitple popups
+
+- [ ] Implement 'surround-type' like surround function for generic types
+Uses correct syntax for known languages (maybe only implemented for those langs)
+eg. Highlight 'User' -> Press 'st' -> Type 'Seq' -> Result: Seq[User]
