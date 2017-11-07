@@ -37,3 +37,7 @@ Run
 * `clean.sh`: Delete compiled files
 * `compile.sh`: Byte compile for performance (Recompile required when new changes are made)
 * `update.sh`: Update Packages
+
+### Notes
+
+Be sure to change `Configuration -> Variables -> Font` if you don't have Iosevka installed.

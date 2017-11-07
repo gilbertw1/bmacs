@@ -12,6 +12,7 @@
   - [[#about-this-file][About this file]]
   - [[#personal-information][Personal Information]]
   - [[#variables][Variables]]
+    - [[#font][Font]]
     - [[#leader-keys][Leader Keys]]
     - [[#directories][Directories]]
     - [[#hooks][Hooks]]
@@ -37,7 +38,7 @@
     - [[#cool-doom-exit-messages][Cool doom exit messages]]
     - [[#ui][UI]]
     - [[#editor][Editor]]
-    - [[#font][Font]]
+    - [[#font-1][Font]]
     - [[#operating-system-specific][Operating System Specific]]
   - [[#core-packages][Core Packages]]
     - [[#which-key][which-key]]
@@ -187,6 +188,12 @@ This is Bryan Gilbert's personal Emacs configuration.
 #+END_SRC
 
 ** Variables
+
+*** Font
+
+#+BEGIN_SRC emacs-lisp
+(defvar bmacs-font (font-spec :family "Iosevka" :size 25))
+#+END_SRC
 
 *** Leader Keys
 
@@ -1082,7 +1089,7 @@ Enable line numbers
 *** Font
 
 #+BEGIN_SRC emacs-lisp
-(set-face-attribute 'default nil :font (font-spec :family "Iosevka" :size 25))
+(set-face-attribute 'default nil :font bmacs-font)
 #+END_SRC
 
 
@@ -2284,7 +2291,7 @@ repository root."
       (git-link (git-link--select-remote) beg end))))
 #+END_SRC
 
-*** evil-magit 
+*** evil-magit
 
 #+BEGIN_SRC emacs-lisp
 (use-package evil-magit
@@ -4109,7 +4116,7 @@ Configuration
   (setq-default
    org-adapt-indentation nil
    org-agenda-dim-blocked-tasks nil
-   org-agenda-files (directory-files +borg-dir t "\\.org$" t)
+   org-agenda-files (if (file-exists-p +borg-dir) (directory-files +borg-dir t "\\.org$" t) nil)
    org-agenda-inhibit-startup t
    org-agenda-skip-unavailable-files nil
    org-cycle-include-plain-lists t
