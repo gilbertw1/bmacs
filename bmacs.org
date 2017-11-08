@@ -113,6 +113,7 @@
     - [[#capture][Capture]]
     - [[#present][Present]]
   - [[#email][Email]]
+    - [[#ace-link-support][Ace Link Support]]
   - [[#tools][Tools]]
     - [[#restclient][Restclient]]
     - [[#dash-docs][Dash Docs]]
@@ -158,6 +159,7 @@
     - [[#pcre2el][pcre2el]]
   - [[#popup-rules][Popup Rules]]
     - [[#messages][Messages]]
+    - [[#pp-eval-output][PP Eval Output]]
     - [[#help][Help]]
     - [[#restclient-1][Restclient]]
     - [[#eshell-1][Eshell]]
@@ -175,7 +177,7 @@
     - [[#adjust-fringe][Adjust Fringe]]
     - [[#update-faces][Update Faces]]
     - [[#mardown-open-comamnd][Mardown Open Comamnd]]
-  - [[#todos-03][Todos]]
+  - [[#todos-04][Todos]]
 
 ** About this file
 
@@ -4547,307 +4549,374 @@ between the two."
 Configuration
 
 #+BEGIN_SRC emacs-lisp
-(defvar +email-mu4e-mail-path "~/.mail"
-  "The directory path of mu's maildir.")
+  (defvar +email-mu4e-mail-path "~/.mail"
+    "The directory path of mu's maildir.")
 
-;;
-;; Plugins
-;;
+  ;;
+  ;; Plugins
+  ;;
 
-(use-package mu4e
-  :ensure nil
-  :commands (mu4e mu4e-compose-new)
-  :config
-  (setq mu4e-maildir +email-mu4e-mail-path
-        mu4e-attachment-dir "~/Downloads"
-        mu4e-user-mail-address-list nil
-        mu4e-update-interval nil
-        mu4e-compose-format-flowed nil ; visual-line-mode + auto-fill upon sending
-        mu4e-view-show-addresses t
-        mu4e-html2text-command 'mu4e-shr2text
-        shr-width 100
-        ;; try to show images
-        mu4e-view-show-images t
-        mu4e-view-image-max-width 800
-        ;; don't save message to Sent Messages, Gmail/IMAP takes care of this
-        mu4e-sent-messages-behavior 'sent
-        ;; for mbsync
-        mu4e-change-filenames-when-moving t
-        ;; allow for updating mail using 'U' in the main view:
-        mu4e-get-mail-command "mbsync-update-fast"
-        ;; configuration for sending mail
-        message-send-mail-function #'smtpmail-send-it
-        smtpmail-stream-type 'ssl
-        ;; start with the first (default) context;
-        mu4e-context-policy 'pick-first
-        ;; compose with the current context, or ask
-        mu4e-compose-context-policy 'ask-if-none
-        ;; use helm/ivy
-        mu4e-completing-read-function #'ivy-completing-read
-        ;; close message after sending it
-        message-kill-buffer-on-exit t
-        ;; no need to ask
-        mu4e-confirm-quit nil
-        ;; remove 'lists' column
-        mu4e-headers-fields
-        '((:account . 12)
-          (:human-date . 12)
-          (:flags . 4)
-          (:from . 25)
-          (:subject))
-        mu4e-bookmarks `(("maildir:/fastmail/INBOX OR maildir:/gmail/INBOX OR maildir:/stream/INBOX" "Inbox" ?i)
-                         ("maildir:/fastmail/Drafts OR maildir:/gmail/[Gmail]/.Drafts OR maildir:/stream/[Gmail]/.Drafts" "Drafts" ?d)
-                         ("flag:unread AND maildir:/fastmail/INBOX OR maildir:/gmail/INBOX OR maildir:/stream/INBOX" "Unread messages" ?u)
-                         ("flag:flagged" "Starred messages" ?s)
-                         ("date:today..now" "Today's messages" ?t)
-                         ("date:7d..now" "Last 7 days" ?w)
-                         ("mime:image/*" "Messages with images" ?p)))
+  (use-package mu4e
+    :ensure nil
+    :commands (mu4e mu4e-compose-new)
+    :config
+    (setq mu4e-maildir +email-mu4e-mail-path
+          mu4e-attachment-dir "~/Downloads"
+          mu4e-user-mail-address-list nil
+          mu4e-update-interval nil
+          mu4e-compose-format-flowed nil ; visual-line-mode + auto-fill upon sending
+          mu4e-view-show-addresses t
+          mu4e-html2text-command 'mu4e-shr2text
+          shr-width 100
+          ;; try to show images
+          mu4e-view-show-images t
+          mu4e-view-image-max-width 800
+          ;; don't save message to Sent Messages, Gmail/IMAP takes care of this
+          mu4e-sent-messages-behavior 'sent
+          ;; for mbsync
+          mu4e-change-filenames-when-moving t
+          ;; allow for updating mail using 'U' in the main view:
+          mu4e-get-mail-command "mbsync-update-fast"
+          ;; configuration for sending mail
+          message-send-mail-function #'smtpmail-send-it
+          smtpmail-stream-type 'ssl
+          ;; start with the first (default) context;
+          mu4e-context-policy 'pick-first
+          ;; compose with the current context, or ask
+          mu4e-compose-context-policy 'ask-if-none
+          ;; use helm/ivy
+          mu4e-completing-read-function #'ivy-completing-read
+          ;; close message after sending it
+          message-kill-buffer-on-exit t
+          ;; no need to ask
+          mu4e-confirm-quit nil
+          ;; remove 'lists' column
+          mu4e-headers-fields
+          '((:account . 12)
+            (:human-date . 12)
+            (:flags . 4)
+            (:from . 25)
+            (:subject))
+          mu4e-bookmarks `(("maildir:/fastmail/INBOX OR maildir:/gmail/INBOX OR maildir:/stream/INBOX" "Inbox" ?i)
+                           ("maildir:/fastmail/Drafts OR maildir:/gmail/[Gmail]/.Drafts OR maildir:/stream/[Gmail]/.Drafts" "Drafts" ?d)
+                           ("flag:unread AND maildir:/fastmail/INBOX OR maildir:/gmail/INBOX OR maildir:/stream/INBOX" "Unread messages" ?u)
+                           ("flag:flagged" "Starred messages" ?s)
+                           ("date:today..now" "Today's messages" ?t)
+                           ("date:7d..now" "Last 7 days" ?w)
+                           ("mime:image/*" "Messages with images" ?p)))
 
-  (add-to-list 'mu4e-view-actions '("ViewInBrowser" . mu4e-action-view-in-browser) t)
+    (add-to-list 'mu4e-view-actions '("ViewInBrowser" . mu4e-action-view-in-browser) t)
 
-  ;; Add a column to display what email account the email belongs to.
-  (add-to-list 'mu4e-header-info-custom
-               '(:account
-                 :name "Account"
-                 :shortname "Account"
-                 :help "Which account this email belongs to"
-                 :function
-                 (lambda (msg)
-                   (let ((maildir (mu4e-message-field msg :maildir)))
-                     (format "%s" (substring maildir 1 (string-match-p "/" maildir 1)))))))
+    ;; Add a column to display what email account the email belongs to.
+    (add-to-list 'mu4e-header-info-custom
+                 '(:account
+                   :name "Account"
+                   :shortname "Account"
+                   :help "Which account this email belongs to"
+                   :function
+                   (lambda (msg)
+                     (let ((maildir (mu4e-message-field msg :maildir)))
+                       (format "%s" (substring maildir 1 (string-match-p "/" maildir 1)))))))
 
 
 
-;; Change refile to an 'A'
-(setq mu4e-marks (assq-delete-all 'refile mu4e-marks))
-(push '(refile
-        :char ("A" . "▶")
-        :prompt "archive"
-        :dyn-target (lambda (target msg) (mu4e-get-refile-folder msg))
-        :action (lambda (docid msg target) (mu4e~proc-move docid
-                                                      (mu4e~mark-check-target target) "-N")))
-      mu4e-marks)
+  ;; Change refile to an 'A'
+  (setq mu4e-marks (assq-delete-all 'refile mu4e-marks))
+  (push '(refile
+          :char ("A" . "▶")
+          :prompt "archive"
+          :dyn-target (lambda (target msg) (mu4e-get-refile-folder msg))
+          :action (lambda (docid msg target) (mu4e~proc-move docid
+                                                        (mu4e~mark-check-target target) "-N")))
+        mu4e-marks)
 
-;; Special handling for fastmail, don't add +T and move to trash
-;; Gmail is configured to automatically add deleted emails to the trash
-(setq mu4e-marks (assq-delete-all 'delete mu4e-marks))
-(push '(delete
-        :char ("D" . "❌")
-        :prompt "Delete"
-        :show-target (lambda (target) "delete")
-        :action (lambda (docid msg target)
-                  (let ((maildir (mu4e-message-field msg :maildir)))
-                    (cond ((string-prefix-p "/fastmail" maildir)
-                           (mu4e~proc-move docid (mu4e-get-trash-folder msg) "-N"))
-                          ((or (string-prefix-p "/gmail" maildir) (string-prefix-p "/stream" maildir))
-                           (shell-command (format "expunge-email-id %s" (mu4e-message-field msg :message-id))))
-                          (true (mu4e~proc-remove docid))))))
-      mu4e-marks)
+  ;; Special handling for fastmail, don't add +T and move to trash
+  ;; Gmail is configured to automatically add deleted emails to the trash
+  (setq mu4e-marks (assq-delete-all 'delete mu4e-marks))
+  (push '(delete
+          :char ("D" . "❌")
+          :prompt "Delete"
+          :show-target (lambda (target) "delete")
+          :action (lambda (docid msg target)
+                    (let ((maildir (mu4e-message-field msg :maildir)))
+                      (cond ((string-prefix-p "/fastmail" maildir)
+                             (mu4e~proc-move docid (mu4e-get-trash-folder msg) "-N"))
+                            ((or (string-prefix-p "/gmail" maildir) (string-prefix-p "/stream" maildir))
+                             (shell-command (format "expunge-email-id %s" (mu4e-message-field msg :message-id))))
+                            (true (mu4e~proc-remove docid))))))
+        mu4e-marks)
 
-  ;; Refresh the current view after marks are executed
-  (defun +email*refresh (&rest _) (mu4e-headers-rerun-search))
-  (advice-add #'mu4e-mark-execute-all :after #'+email*refresh)
+    ;; Refresh the current view after marks are executed
+    (defun +email*refresh (&rest _) (mu4e-headers-rerun-search))
+    (advice-add #'mu4e-mark-execute-all :after #'+email*refresh)
 
-  (add-hook 'mu4e-compose-mode-hook (lambda ()
+    (add-hook 'mu4e-compose-mode-hook (lambda ()
+                                        (setq-local fill-column 120)
+                                        (auto-fill-mode -1)
+                                        (visual-line-mode)
+                                        (visual-fill-column-mode)))
+
+  (add-hook 'mu4e-view-mode-hook (lambda ()
                                       (setq-local fill-column 120)
-                                      (auto-fill-mode -1)
                                       (visual-line-mode)
                                       (visual-fill-column-mode)))
 
-(add-hook 'mu4e-view-mode-hook (lambda ()
-                                    (setq-local fill-column 120)
-                                    (visual-line-mode)
-                                    (visual-fill-column-mode)))
+    ; (when (featurep! :feature spellcheck) TODO
+    ;   (add-hook 'mu4e-compose-mode-hook #'flyspell-mode))
 
-  ; (when (featurep! :feature spellcheck) TODO
-  ;   (add-hook 'mu4e-compose-mode-hook #'flyspell-mode))
+    ;; Wrap text in messages
+    (add-hook! 'mu4e-view-mode-hook
+      (setq-local truncate-lines nil))
 
-  ;; Wrap text in messages
-  (add-hook! 'mu4e-view-mode-hook
-    (setq-local truncate-lines nil))
+    (when (fboundp 'imagemagick-register-types)
+      (imagemagick-register-types))
 
-  (when (fboundp 'imagemagick-register-types)
-    (imagemagick-register-types))
+    (after! evil
+      (cl-loop for str in '((mu4e-main-mode . normal)
+                            (mu4e-view-mode . normal)
+                            (mu4e-headers-mode . normal)
+                            (mu4e-compose-mode . normal)
+                            (mu4e~update-mail-mode . normal))
+               do (evil-set-initial-state (car str) (cdr str)))
 
-  (after! evil
-    (cl-loop for str in '((mu4e-main-mode . normal)
-                          (mu4e-view-mode . normal)
-                          (mu4e-headers-mode . normal)
-                          (mu4e-compose-mode . normal)
-                          (mu4e~update-mail-mode . normal))
-             do (evil-set-initial-state (car str) (cdr str)))
+      (setq mu4e-view-mode-map (make-sparse-keymap)
+            ;; mu4e-compose-mode-map (make-sparse-keymap)
+            mu4e-headers-mode-map (make-sparse-keymap)
+            mu4e-main-mode-map (make-sparse-keymap))
 
-    (setq mu4e-view-mode-map (make-sparse-keymap)
-          ;; mu4e-compose-mode-map (make-sparse-keymap)
-          mu4e-headers-mode-map (make-sparse-keymap)
-          mu4e-main-mode-map (make-sparse-keymap))
+      (map! (:map (mu4e-main-mode-map mu4e-view-mode-map)
+              :localleader
+              :n "s" #'mu4e-context-switch
+              :n "b" #'mu4e-headers-search-bookmark
+              :n "B" #'mu4e-headers-search-bookmark-edit
+              :n "j" #'mu4e~headers-jump-to-maildir
+              :n "/" #'mu4e-headers-search)
 
-    (map! (:map (mu4e-main-mode-map mu4e-view-mode-map)
-            :localleader
-            :n "s" #'mu4e-context-switch
-            :n "b" #'mu4e-headers-search-bookmark
-            :n "B" #'mu4e-headers-search-bookmark-edit
-            :n "j" #'mu4e~headers-jump-to-maildir
-            :n "/" #'mu4e-headers-search)
+            (:map (mu4e-headers-mode-map mu4e-view-mode-map)
+              :localleader
+              :n "f" #'mu4e-compose-forward
+              :n "r" #'mu4e-compose-reply
+              :n "c" #'mu4e-compose-new
+              :n "e" #'mu4e-compose-edit)
 
-          (:map (mu4e-headers-mode-map mu4e-view-mode-map)
-            :localleader
-            :n "f" #'mu4e-compose-forward
-            :n "r" #'mu4e-compose-reply
-            :n "c" #'mu4e-compose-new
-            :n "e" #'mu4e-compose-edit)
+            (:map mu4e-main-mode-map
+              :n "J"   #'mu4e~headers-jump-to-maildir
+              :n "s"   #'mu4e-headers-search
+              :n "q"   #'mu4e-quit
+              :n "u"   #'mu4e-update-index
+              :n "U"   #'mu4e-update-mail-and-index
+              :n "J"   #'mu4e~headers-jump-to-maildir
+              :n "c"   #'+email/compose
+              :n "C"   #'+email/compose
+              :n "b"   #'mu4e-headers-search-bookmark)
 
-          (:map mu4e-main-mode-map
-            :n "J"   #'mu4e~headers-jump-to-maildir
-            :n "s"   #'mu4e-headers-search
-            :n "q"   #'mu4e-quit
-            :n "u"   #'mu4e-update-index
-            :n "U"   #'mu4e-update-mail-and-index
-            :n "J"   #'mu4e~headers-jump-to-maildir
-            :n "c"   #'+email/compose
-            :n "C"   #'+email/compose
-            :n "b"   #'mu4e-headers-search-bookmark)
+            (:map mu4e-headers-mode-map
+              :n "q"   #'mu4e~headers-quit-buffer
+              :n "r"   #'mu4e-compose-reply
+              :n "c"   #'mu4e-compose-edit
+              :n "s"   #'mu4e-headers-search-edit
+              :n "S"   #'mu4e-headers-search-narrow
+              :n "RET" #'mu4e-headers-view-message
+              :n "u"   #'mu4e-headers-mark-for-unmark
+              :n "U"   #'mu4e-mark-unmark-all
+              :n "v"   #'evil-visual-line
+              :nv "d"  #'mu4e-headers-mark-for-delete
+              :nv "a"  #'mu4e-headers-mark-for-refile
+              :n "x"   #'mu4e-mark-execute-all
 
-          (:map mu4e-headers-mode-map
-            :n "q"   #'mu4e~headers-quit-buffer
-            :n "r"   #'mu4e-compose-reply
-            :n "c"   #'mu4e-compose-edit
-            :n "s"   #'mu4e-headers-search-edit
-            :n "S"   #'mu4e-headers-search-narrow
-            :n "RET" #'mu4e-headers-view-message
-            :n "u"   #'mu4e-headers-mark-for-unmark
-            :n "U"   #'mu4e-mark-unmark-all
-            :n "v"   #'evil-visual-line
-            :nv "d"  #'mu4e-headers-mark-for-delete
-            :nv "a"  #'mu4e-headers-mark-for-refile
-            :n "x"   #'mu4e-mark-execute-all
+              :n "]]"  #'mu4e-headers-next-unread
+              :n "[["  #'mu4e-headers-prev-unread
 
-            :n "]]"  #'mu4e-headers-next-unread
-            :n "[["  #'mu4e-headers-prev-unread
+              (:localleader
+                :n "s" 'mu4e-headers-change-sorting
+                :n "t" 'mu4e-headers-toggle-threading
+                :n "r" 'mu4e-headers-toggle-include-related
+                :n "a" #'mu4e-headers-action
+                :n "%" #'mu4e-headers-mark-pattern
+                :n "t" #'mu4e-headers-mark-subthread
+                :n "T" #'mu4e-headers-mark-thread
+                :n "/" #'mu4e-headers-search-narrow))
 
-            (:localleader
-              :n "s" 'mu4e-headers-change-sorting
-              :n "t" 'mu4e-headers-toggle-threading
-              :n "r" 'mu4e-headers-toggle-include-related
-              :n "a" #'mu4e-headers-action
-              :n "%" #'mu4e-headers-mark-pattern
-              :n "t" #'mu4e-headers-mark-subthread
-              :n "T" #'mu4e-headers-mark-thread
-              :n "/" #'mu4e-headers-search-narrow))
+            (:map mu4e-view-mode-map
+              :n "q" #'mu4e~view-quit-buffer
+              :n "r" #'mu4e-compose-reply
+              :n "c" #'mu4e-compose-edit
+              :n "o" #'ace-link-mu4e
+              :n "O" #'mu4e-view-go-to-url
+              :n "d"  #'mu4e-view-mark-for-delete
+              :n "a"  #'mu4e-view-mark-for-refile
 
-          (:map mu4e-view-mode-map
-            :n "q" #'mu4e~view-quit-buffer
-            :n "r" #'mu4e-compose-reply
-            :n "c" #'mu4e-compose-edit
-            :n "o" #'mu4e-view-go-to-url
-            :n "d"  #'mu4e-view-mark-for-delete
-            :n "a"  #'mu4e-view-mark-for-refile
+              :n "<M-Left>"  #'mu4e-view-headers-prev
+              :n "<M-Right>" #'mu4e-view-headers-next
+              :n "[m" #'mu4e-view-headers-prev
+              :n "]m" #'mu4e-view-headers-next
+              :n "[u" #'mu4e-view-headers-prev-unread
+              :n "]u" #'mu4e-view-headers-next-unread
 
-            :n "<M-Left>"  #'mu4e-view-headers-prev
-            :n "<M-Right>" #'mu4e-view-headers-next
-            :n "[m" #'mu4e-view-headers-prev
-            :n "]m" #'mu4e-view-headers-next
-            :n "[u" #'mu4e-view-headers-prev-unread
-            :n "]u" #'mu4e-view-headers-next-unread
+              (:localleader
+                :n "%" #'mu4e-view-mark-pattern
+                :n "t" #'mu4e-view-mark-subthread
+                :n "T" #'mu4e-view-mark-thread
+                :n "a" #'mu4e-view-action
+                :n "o" #'mu4e-view-open-attachment
+                :n "d" #'mu4e-view-mark-for-trash
+                :n "r" #'mu4e-view-mark-for-refile
+                :n "m" #'mu4e-view-mark-for-move))
 
-            (:localleader
-              :n "%" #'mu4e-view-mark-pattern
-              :n "t" #'mu4e-view-mark-subthread
-              :n "T" #'mu4e-view-mark-thread
-              :n "a" #'mu4e-view-action
-              :n "o" #'mu4e-view-open-attachment
-              :n "d" #'mu4e-view-mark-for-trash
-              :n "r" #'mu4e-view-mark-for-refile
-              :n "m" #'mu4e-view-mark-for-move))
-
-          (:map mu4e~update-mail-mode-map
-            :n "q" #'mu4e-interrupt-update-mail))))
+            (:map mu4e~update-mail-mode-map
+              :n "q" #'mu4e-interrupt-update-mail))))
 
 
-(use-package mu4e-maildirs-extension
-  :after mu4e
-  :config (mu4e-maildirs-extension-load))
+  (use-package mu4e-maildirs-extension
+    :after mu4e
+    :config (mu4e-maildirs-extension-load))
 
 
-(defun bmail-refile-folder-function (msg)
-  "Set the refile folder for MSG."
-  (let ((maildir (mu4e-message-field msg :maildir)))
-    (cond
-     ((string-prefix-p "/fastmail" maildir)
-      "/fastmail/Archive")
-     ((string-prefix-p "/gmail" maildir)
-      "/gmail/[Gmail]/All Mail")
-     ((string-prefix-p "/stream" maildir)
-      "/stream/[Gmail]/All Mail")
-     (t nil))))
+  (defun bmail-refile-folder-function (msg)
+    "Set the refile folder for MSG."
+    (let ((maildir (mu4e-message-field msg :maildir)))
+      (cond
+       ((string-prefix-p "/fastmail" maildir)
+        "/fastmail/Archive")
+       ((string-prefix-p "/gmail" maildir)
+        "/gmail/[Gmail]/All Mail")
+       ((string-prefix-p "/stream" maildir)
+        "/stream/[Gmail]/All Mail")
+       (t nil))))
 
-(defun bmail-trash-folder-function (msg)
-  "Set the trash folder for MSG."
-  (let ((maildir (mu4e-message-field msg :maildir)))
-    (cond
-     ((string-prefix-p "/fastmail" maildir)
-      "/fastmail/Trash")
-     ((string-prefix-p "/gmail" maildir)
-      "/gmail/[Gmail]/.Trash")
-     ((string-prefix-p "/stream" maildir)
-      "/stream/[Gmail]/.Trash")
-     (t nil))))
+  (defun bmail-trash-folder-function (msg)
+    "Set the trash folder for MSG."
+    (let ((maildir (mu4e-message-field msg :maildir)))
+      (cond
+       ((string-prefix-p "/fastmail" maildir)
+        "/fastmail/Trash")
+       ((string-prefix-p "/gmail" maildir)
+        "/gmail/[Gmail]/.Trash")
+       ((string-prefix-p "/stream" maildir)
+        "/stream/[Gmail]/.Trash")
+       (t nil))))
 
-(defun email-signature (address)
-  (+gilbertw1/file-as-string
-   (expand-file-name (concat "~/.signatures/" address))))
+  (defun email-signature (address)
+    (+gilbertw1/file-as-string
+     (expand-file-name (concat "~/.signatures/" address))))
 
-(after! mu4e
-  (setq mu4e-refile-folder #'bmail-refile-folder-function
-        mu4e-trash-folder #'bmail-trash-folder-function
-        smtpmail-debug-info t
-        smtpmail-stream-type 'ssl
-        smtpmail-default-smtp-server "smtp.fastmail.com"
-        smtpmail-smtp-server "smtp.fastmail.com"
-        smtpmail-smtp-user "gilbertw1@fastmail.com"
-        smtpmail-smtp-service 465)
+  (after! mu4e
+    (setq mu4e-refile-folder #'bmail-refile-folder-function
+          mu4e-trash-folder #'bmail-trash-folder-function
+          smtpmail-debug-info t
+          smtpmail-stream-type 'ssl
+          smtpmail-default-smtp-server "smtp.fastmail.com"
+          smtpmail-smtp-server "smtp.fastmail.com"
+          smtpmail-smtp-user "gilbertw1@fastmail.com"
+          smtpmail-smtp-service 465)
 
-  (setq mu4e-contexts
-      `(,(make-mu4e-context
-          :name "fastmail"
-          :match-func (lambda (msg) (when msg
-                                 (string-prefix-p "/fastmail" (mu4e-message-field msg :maildir))))
-          :vars '((mu4e-sent-folder          . "/fastmail/Sent")
-                  (mu4e-drafts-folder        . "/fastmail/Drafts")
-                  (smtpmail-smtp-user        . "gilbertw1@fastmail.com")
-                  (smtpmail-smtp-server      . "smtp.fastmail.com")
-                  (smtpmail-stream-type      . ssl)
-                  (smtpmail-smtp-service     . 465)
-                  (user-mail-address         . "bryan@bryan.sh")
-                  (user-full-name            . "Bryan Gilbert")
-                  (mu4e-compose-signature    . (email-signature "bryan@bryan.sh"))))
-        ,(make-mu4e-context
-          :name "gmail"
-          :match-func (lambda (msg) (when msg
-                                 (string-prefix-p "/gmail" (mu4e-message-field msg :maildir))))
-          :vars '((mu4e-sent-folder          . "/gmail/[Gmail]/.Sent Mail")
-                  (mu4e-drafts-folder        . "/gmail/[Gmail]/.Drafts")
-                  (smtpmail-smtp-user        . "gilbertw1@gmail.com")
-                  (smtpmail-smtp-server      . "smtp.gmail.com")
-                  (smtpmail-stream-type      . starttls)
-                  (smtpmail-smtp-service     . 587)
-                  (user-mail-address         . "gilbertw1@gmail.com")
-                  (user-full-name            . "Bryan Gilbert")
-                  (mu4e-compose-signature    . (email-signature "gilbertw1@gmail.com"))))
-        ,(make-mu4e-context
-          :name "stream"
-          :match-func (lambda (msg) (when msg
-                                 (string-prefix-p "/stream" (mu4e-message-field msg :maildir))))
-          :vars '((mu4e-sent-folder          . "/stream/[Gmail]/.Sent Mail")
-                  (mu4e-drafts-folder        . "/stream/[Gmail]/.Drafts")
-                  (smtpmail-smtp-user        . "bryan@stre.am")
-                  (smtpmail-smtp-server      . "smtp.gmail.com")
-                  (smtpmail-stream-type      . starttls)
-                  (smtpmail-smtp-service     . 587)
-                  (user-mail-address         . "bryan@stream.live")
-                  (user-full-name            . "Bryan Gilbert")
-                  (mu4e-compose-signature    . (email-signature "bryan@stream.live")))))))
+    (setq mu4e-contexts
+        `(,(make-mu4e-context
+            :name "fastmail"
+            :match-func (lambda (msg) (when msg
+                                   (string-prefix-p "/fastmail" (mu4e-message-field msg :maildir))))
+            :vars '((mu4e-sent-folder          . "/fastmail/Sent")
+                    (mu4e-drafts-folder        . "/fastmail/Drafts")
+                    (smtpmail-smtp-user        . "gilbertw1@fastmail.com")
+                    (smtpmail-smtp-server      . "smtp.fastmail.com")
+                    (smtpmail-stream-type      . ssl)
+                    (smtpmail-smtp-service     . 465)
+                    (user-mail-address         . "bryan@bryan.sh")
+                    (user-full-name            . "Bryan Gilbert")
+                    (mu4e-compose-signature    . (email-signature "bryan@bryan.sh"))))
+          ,(make-mu4e-context
+            :name "gmail"
+            :match-func (lambda (msg) (when msg
+                                   (string-prefix-p "/gmail" (mu4e-message-field msg :maildir))))
+            :vars '((mu4e-sent-folder          . "/gmail/[Gmail]/.Sent Mail")
+                    (mu4e-drafts-folder        . "/gmail/[Gmail]/.Drafts")
+                    (smtpmail-smtp-user        . "gilbertw1@gmail.com")
+                    (smtpmail-smtp-server      . "smtp.gmail.com")
+                    (smtpmail-stream-type      . starttls)
+                    (smtpmail-smtp-service     . 587)
+                    (user-mail-address         . "gilbertw1@gmail.com")
+                    (user-full-name            . "Bryan Gilbert")
+                    (mu4e-compose-signature    . (email-signature "gilbertw1@gmail.com"))))
+          ,(make-mu4e-context
+            :name "stream"
+            :match-func (lambda (msg) (when msg
+                                   (string-prefix-p "/stream" (mu4e-message-field msg :maildir))))
+            :vars '((mu4e-sent-folder          . "/stream/[Gmail]/.Sent Mail")
+                    (mu4e-drafts-folder        . "/stream/[Gmail]/.Drafts")
+                    (smtpmail-smtp-user        . "bryan@stre.am")
+                    (smtpmail-smtp-server      . "smtp.gmail.com")
+                    (smtpmail-stream-type      . starttls)
+                    (smtpmail-smtp-service     . 587)
+                    (user-mail-address         . "bryan@stream.live")
+                    (user-full-name            . "Bryan Gilbert")
+                    (mu4e-compose-signature    . (email-signature "bryan@stream.live")))))))
 
+#+END_SRC
+
+*** Ace Link Support
+
+#+BEGIN_SRC emacs-lisp
+(defun ace-link-mu4e ()
+  "Open a visible link in an `mu4e-view-mode' buffer."
+  (interactive)
+  (let ((pt (avy-with ace-link-mu4e
+              (avy--process
+               (mapcar #'cdr (ace-link--mu4e-collect))
+               (avy--style-fn avy-style)))))
+    (ace-link--mu4e-action pt)))
+
+(declare-function mu4e-follow-link "mu4e~view-browse-url-from-binding")
+
+(defun ace-link--mu4e-action (pt)
+  (when (number-or-marker-p pt)
+    (goto-char (1+ pt))
+    (mu4e~view-browse-url-from-binding)
+    (shr-browse-url)))
+
+(defun ace-link--mu4e-collect ()
+  "Collect the positions of visible links in the current `mu4e' buffer."
+  (save-excursion
+    (save-restriction
+      (narrow-to-region
+       (window-start)
+       (window-end))
+      (goto-char (point-min))
+      (let (beg end candidates)
+        ;; SHR Mode
+        (setq end
+              (if (get-text-property (point) 'shr-url)
+                  (point)
+                (text-property-any
+                 (point) (point-max) 'shr-url nil)))
+
+        (while (setq beg (text-property-not-all
+                          end (point-max) 'shr-url nil))
+          (goto-char beg)
+          (setq end (text-property-any
+                     (point) (point-max) 'shr-url nil))
+          (unless end
+            (setq end (point-max)))
+            (push (cons (buffer-substring-no-properties beg end) beg)
+                   candidates))
+
+        ;; Normal Mode
+        (setq end
+              (if (eq (get-text-property (point) 'mu4e-url) 'highlight)
+                  (point)
+                (text-property-any
+                 (point) (point-max) 'mu4e-url nil)))
+
+        (while (setq beg (text-property-not-all
+                          end (point-max) 'mu4e-url nil))
+          (goto-char beg)
+          (setq end (text-property-any
+                     (point) (point-max) 'mu4e-url nil))
+          (unless end
+            (setq end (point-max)))
+          (push (cons (buffer-substring-no-properties beg end) beg)
+                candidates))
+
+        (nreverse candidates)))))
 #+END_SRC
 
 ** Tools
@@ -6691,6 +6760,19 @@ Improved help commands
                (window-height   . 0.4))))
 #+END_SRC
 
+*** PP Eval Output
+
+#+BEGIN_SRC emacs-lisp
+(let ((pp-eval-buffer-rx (rx bos "*Pp Eval Output*" eos)))
+  (add-to-list 'bmacs-popups pp-eval-buffer-rx)
+  (add-to-list 'display-buffer-alist
+             `(,pp-eval-buffer-rx
+               (display-buffer-in-side-window)
+               (reusable-frames . visible)
+               (side            . bottom)
+               (window-height   . 0.4))))
+#+END_SRC
+
 *** Help
 
 #+BEGIN_SRC emacs-lisp
@@ -7779,7 +7861,7 @@ Set the various indentations
 #+END_SRC
 
 
-** Todos [0/3]
+** Todos [0/4]
 
 - [ ] Fix evil-mc incorrect cursor position
       When using 'C-S-j' sometimes the cursor jumps around
@@ -7789,3 +7871,5 @@ Uses correct syntax for known languages (maybe only implemented for those langs)
 eg. Highlight 'User' -> Press 'st' -> Type 'Seq' -> Result: Seq[User]
 
 - [ ] In command buffer map C-p/n to previous next command
+
+- [ ] Cleanup mu4e ace link support and create pr to ace-link
