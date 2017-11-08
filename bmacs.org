@@ -4706,8 +4706,7 @@ Configuration
               :n "u"   #'mu4e-update-index
               :n "U"   #'mu4e-update-mail-and-index
               :n "J"   #'mu4e~headers-jump-to-maildir
-              :n "c"   #'+email/compose
-              :n "C"   #'+email/compose
+              :n "c"   #'mu4e-compose-new
               :n "b"   #'mu4e-headers-search-bookmark)
 
             (:map mu4e-headers-mode-map
