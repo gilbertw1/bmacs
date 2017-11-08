@@ -4796,7 +4796,7 @@ Configuration
        (t nil))))
 
   (defun email-signature (address)
-    (+gilbertw1/file-as-string
+    (bmacs/file-as-string
      (expand-file-name (concat "~/.signatures/" address))))
 
   (after! mu4e
