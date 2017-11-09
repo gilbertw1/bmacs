@@ -161,6 +161,7 @@
     - [[#pcre2el][pcre2el]]
   - [[#popup-rules][Popup Rules]]
     - [[#messages][Messages]]
+    - [[#backtrace][Backtrace]]
     - [[#pp-eval-output][PP Eval Output]]
     - [[#help][Help]]
     - [[#restclient-1][Restclient]]
@@ -4867,56 +4868,65 @@ Configuration
 *** Ace Link Support
 
 #+BEGIN_SRC emacs-lisp
-  (defun ace-link-mu4e ()
-    "Open a visible link in an `mu4e-view-mode' buffer."
-    (interactive)
-    (let ((pt (avy-with ace-link-mu4e
-                (avy--process
-                 (mapcar #'cdr (ace-link--mu4e-collect))
-                 (avy--style-fn avy-style)))))
-      (ace-link--mu4e-action pt)))
+(defun ace-link-mu4e ()
+  "Open a visible link in an `mu4e-view-mode' buffer."
+  (interactive)
+  (let ((pt (avy-with ace-link-mu4e
+              (avy--process
+               (mapcar #'cdr (ace-link--mu4e-collect))
+               (avy--style-fn avy-style)))))
+    (ace-link--mu4e-action pt)))
 
-  (declare-function shr-browse-url "shr")
-  (declare-function mu4e~view-browse-url-from-binding "ext:mu4e-view")
+(declare-function shr-browse-url "shr")
+(declare-function mu4e~view-browse-url-from-binding "ext:mu4e-view")
 
-  (defun ace-link--mu4e-action (pt)
-    (when (number-or-marker-p pt)
-      (goto-char (1+ pt))
-      (cond ((get-text-property (point) 'shr-url)
-             (shr-browse-url))
-            ((get-text-property (point) 'mu4e-url)
-             (mu4e~view-browse-url-from-binding)))))
+(defun ace-link--mu4e-action (pt)
+  (when (number-or-marker-p pt)
+    (goto-char (1+ pt))
+    (cond ((get-text-property (point) 'shr-url)
+           (shr-browse-url))
+          ((get-text-property (point) 'mu4e-url)
+           (mu4e~view-browse-url-from-binding))
+          ((get-text-property (point) 'mu4e-attnum)
+           (mu4e~view-open-attach-from-binding)))))
 
-  (defun ace-link--mu4e-next-link (pos)
-    (let ((shr-link-pos (text-property-not-all pos (point-max) 'shr-url nil))
-          (mu4e-link-pos (text-property-not-all pos (point-max) 'mu4e-url nil)))
-      (cond ((and shr-link-pos mu4e-link-pos)
-             (if (< shr-link-pos mu4e-link-pos)
-                 (list 'shr-url shr-link-pos)
-               (list 'mu4e-url mu4e-link-pos)))
-            (shr-link-pos (list 'shr-url shr-link-pos))
-            (mu4e-link-pos (list 'mu4e-url mu4e-link-pos))
-            (t nil))))
+(defun ace-link--mu4e-next-link (pos)
+  (let* ((shr-link-pos (text-property-not-all pos (point-max) 'shr-url nil))
+         (mu4e-link-pos (text-property-not-all pos (point-max) 'mu4e-url nil))
+         (mu4e-att-link-pos (text-property-not-all pos (point-max) 'mu4e-attnum nil))
+         (links (seq-filter
+                 (lambda (link)
+                   (elt link 1))
+                 (list
+                  (list 'shr-url shr-link-pos)
+                  (list 'mu4e-url mu4e-link-pos)
+                  (list 'mu4e-attnum mu4e-att-link-pos)))))
 
-  (defun ace-link--mu4e-end-of-link (link)
-    (or (text-property-any (elt link 1) (point-max) (elt link 0) nil)
-        (point-max)))
+    (if links
+        (car
+         (sort links (lambda (x y)
+                       (< (elt x 1) (elt y 1)))))
+      nil)))
 
-  (defun ace-link--mu4e-collect ()
-    "Collect the positions of visible links in the current mu4e buffer."
-    (save-excursion
-      (save-restriction
-        (narrow-to-region
-         (window-start)
-         (window-end))
-        (goto-char (point-min))
-        (let (link pos candidates)
-          (setq pos (point))
-          (while (setq link (ace-link--mu4e-next-link pos))
-            (goto-char (elt link 1))
-            (setq pos (ace-link--mu4e-end-of-link link))
-            (push (cons (buffer-substring-no-properties (elt link 1) pos) (elt link 1)) candidates))
-          (nreverse candidates)))))
+(defun ace-link--mu4e-end-of-link (link)
+  (or (text-property-any (elt link 1) (point-max) (elt link 0) nil)
+      (point-max)))
+
+(defun ace-link--mu4e-collect ()
+  "Collect the positions of visible links in the current mu4e buffer."
+  (save-excursion
+    (save-restriction
+      (narrow-to-region
+       (window-start)
+       (window-end))
+      (goto-char (point-min))
+      (let (link pos candidates)
+        (setq pos (point))
+        (while (setq link (ace-link--mu4e-next-link pos))
+          (goto-char (elt link 1))
+          (setq pos (ace-link--mu4e-end-of-link link))
+          (push (cons (buffer-substring-no-properties (elt link 1) pos) (elt link 1)) candidates))
+        (nreverse candidates)))))
 #+END_SRC
 
 *** Fix Mark Emails in Region
@@ -6779,6 +6789,19 @@ Improved help commands
   (add-to-list 'bmacs-popups messages-buffer-rx)
   (add-to-list 'display-buffer-alist
              `(,messages-buffer-rx
+               (display-buffer-in-side-window)
+               (reusable-frames . visible)
+               (side            . bottom)
+               (window-height   . 0.4))))
+#+END_SRC
+
+*** Backtrace
+
+#+BEGIN_SRC emacs-lisp
+(let ((backtrace-buffer-rx (rx bos "*Backtrace*" eos)))
+  (add-to-list 'bmacs-popups backtrace-buffer-rx)
+  (add-to-list 'display-buffer-alist
+             `(,backtrace-buffer-rx
                (display-buffer-in-side-window)
                (reusable-frames . visible)
                (side            . bottom)
