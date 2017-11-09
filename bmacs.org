@@ -114,6 +114,7 @@
     - [[#present][Present]]
   - [[#email][Email]]
     - [[#ace-link-support][Ace Link Support]]
+    - [[#fix-mark-emails-in-region][Fix Mark Emails in Region]]
   - [[#tools][Tools]]
     - [[#restclient][Restclient]]
     - [[#dash-docs][Dash Docs]]
@@ -4906,6 +4907,27 @@ Configuration
             (setq pos (ace-link--mu4e-end-of-link link))
             (push (cons (buffer-substring-no-properties (elt link 1) pos) (elt link 1)) candidates))
           (nreverse candidates)))))
+#+END_SRC
+
+*** Fix Mark Emails in Region
+
+#+BEGIN_SRC emacs-lisp
+(after! mu4e
+  (defun mu4e-mark-set (mark &optional target)
+    "Mark the header at point, or, if region is active, mark all
+  headers in the region. Optionally, provide TARGET (for moves)."
+    (unless target
+      (setq target (mu4e~mark-ask-target mark)))
+    (if (not (use-region-p))
+      ;; single message
+      (mu4e-mark-at-point mark target)
+      ;; mark all messages in the region.
+      (save-excursion
+        (let ((cant-go-further) (eor (region-end)))
+	  (goto-char (region-beginning))
+	  (while (and (< (point) eor) (not cant-go-further))
+	    (mu4e-mark-at-point mark target)
+	    (setq cant-go-further (not (mu4e-headers-next)))))))))
 #+END_SRC
 
 ** Tools
