@@ -2248,9 +2248,7 @@ Check syntax!
     (when (and (buffer-file-name)
                (not (file-remote-p (buffer-file-name))))
       (git-gutter-mode +1)))
-  (add-hook 'text-mode #'+version-control|git-gutter-maybe)
-  (add-hook 'prog-mode #'+version-control|git-gutter-maybe)
-  (add-hook 'conf-mode #'+version-control|git-gutter-maybe)
+  (add-hook! (text-mode prog-mode conf-mode) #'+version-control|git-gutter-maybe)
   :config
   ;; Update git-gutter on focus (in case I was using git externally)
   (add-hook 'focus-in-hook #'git-gutter:update-all-windows)
