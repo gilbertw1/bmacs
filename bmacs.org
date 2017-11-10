@@ -167,6 +167,7 @@
     - [[#restclient-1][Restclient]]
     - [[#eshell-1][Eshell]]
     - [[#flycheck-1][Flycheck]]
+    - [[#vcdiff][VCDiff]]
   - [[#functions][Functions]]
     - [[#file-functions][File Functions]]
     - [[#buffer-functions][Buffer Functions]]
@@ -6904,6 +6905,20 @@ Improved help commands
                  (window-height   . 0.4))))
 #+END_SRC
 
+
+*** VCDiff
+
+#+BEGIN_SRC emacs-lisp
+(let ((vcdiff-buffer-rx (rx bos "*vc-diff*" eos)))
+  (add-to-list 'bmacs-popups vcdiff-buffer-rx)
+  (add-to-list 'display-buffer-alist
+               `(,vcdiff-buffer-rx
+                 (display-buffer-reuse-window
+                  display-buffer-in-side-window)
+                 (reusable-frames . visible)
+                 (side            . bottom)
+                 (window-height   . 0.4))))
+#+END_SRC
 
 ** Functions
 
