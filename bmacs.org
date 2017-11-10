@@ -3905,7 +3905,7 @@ Jump to any definition ... the dumb way!
 
 (defun bmacs/jump-definition-other-window ()
   (interactive)
-  (+jump/definition t))
+  (bmacs/jump-definition t))
 #+END_SRC
 
 **** TODO Pull over the jump/search online stuff
