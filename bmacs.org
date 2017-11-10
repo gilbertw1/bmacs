@@ -350,8 +350,8 @@ We're going to set the load path ourselves so that we don't have to call =packag
 runtime and incur a large performance hit.
 
 #+BEGIN_SRC emacs-lisp
-   (eval-and-compile
-     (setq load-path (append load-path (directory-files package-user-dir t "^[^.]" t))))
+  (eval-and-compile
+    (setq load-path (append load-path (directory-files package-user-dir t "^[^.]" t))))
 #+END_SRC
 
 Next we are going to require =package.el= and add our additional package archives, 'melpa' and 'org'.
@@ -2138,6 +2138,23 @@ Treat simple code blocks as text objects using 'b'
   (map! :textobj "b" #'evil-textobj-anyblock-inner-block #'evil-textobj-anyblock-a-block))
 #+END_SRC
 
+**** goto-chg
+
+#+BEGIN_SRC emacs-lisp
+(use-package goto-chg
+  :after evil)
+#+END_SRC
+
+**** evil-terminal-cursor-changer
+When used in the terminal over ssh, this allows emacs to properly update the cursor shape in evil mode.
+
+#+BEGIN_SRC emacs-lisp
+  (unless (display-graphic-p)
+    (use-package evil-terminal-cursor-changer
+       :demand t
+       :config (evil-terminal-cursor-changer-activate)))
+#+END_SRC
+
 *** TODO Editorconfig?
 
 *** hideshow
@@ -2231,8 +2248,12 @@ Check syntax!
 *** Magit
 
 #+BEGIN_SRC emacs-lisp
+;; TODO
 (use-package magit
-  :commands (magit-status magit-blame magit-log-buffer-file))
+  :commands (magit-status magit-blame magit-log-buffer-file)
+  :config
+  (map! :map magit-mode-map
+        "SPC" nil))
 #+END_SRC
 
 *** gitconfig-mode
@@ -2335,6 +2356,7 @@ repository root."
   :after magit
   :init
   (setq magithub-dir (concat bmacs-cache-dir "magithub"))
+  (setq magithub-cache t)
   :config
   (magithub-feature-autoinject t)
   (load "magithub-issue-view.el"))
@@ -6249,7 +6271,7 @@ is loaded.")
         python-shell-interpreter "python")
 
   :config
-  (add-hook 'python-mode-hook #'(flycheck-mode highlight-numbers-mode))
+  (add-hook! 'python-mode-hook #'(flycheck-mode highlight-numbers-mode))
 
   (when (executable-find "ipython")
     (setq python-shell-interpreter "ipython"
@@ -6269,7 +6291,7 @@ is loaded.")
           (if +python-current-version
               (format "Python %s" +python-current-version)
             "Python")))
-  (add-hook 'python-mode-hook #'+python|add-version-to-modeline)
+  (add-hook! 'python-mode-hook #'+python|add-version-to-modeline)
 
   (if (not (executable-find "pyenv"))
       (setq +python-current-version (string-trim (shell-command-to-string "python --version 2>&1 | cut -d' ' -f2")))
