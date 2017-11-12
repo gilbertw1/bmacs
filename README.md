@@ -26,17 +26,28 @@ It is heavily influenced by and would not exist without the fantastic
 Install
 
     git clone git@github.com:gilbertw1/bmacs-new.git ~/.emacs.d
-    ~/.emacs.d/scripts/compile.sh
+
+Compile
+
+    make compile
 
 Run
 
     emacs
 
-### Scripts
+### Make Commands
 
-* `clean.sh`: Delete compiled files
-* `compile.sh`: Byte compile for performance (Recompile required when new changes are made)
-* `update.sh`: Update Packages
+`clean`: Delete compiled files
+
+    make clean
+
+`compile`: Byte compile for performance (Recompile required when new changes are made)
+
+    make compile
+
+`update.sh`: Update Packages
+
+    make update
 
 ### Notes
 

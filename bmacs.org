@@ -1673,7 +1673,7 @@ Nice ivy hydra
     :init
     (map! :map ivy-minibuffer-map
           "C-o" #'+ivy@coo/body
-          "M-o" #'ivy-dispatching-done-hydra) TODO
+          "M-o" #'ivy-dispatching-done-hydra)
     :config
     (defhydra +ivy@coo (:hint nil :color pink)
       "
