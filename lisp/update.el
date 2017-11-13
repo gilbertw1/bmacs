@@ -15,6 +15,29 @@
                (save-silently t))
        ,@forms)))
 
+(defun get-version (name where)
+  (let ((pkg (cadr (assq name where))))
+    (when pkg
+      (package-desc-version pkg))))
+
+(defun get-available-updates ()
+  (let (updates)
+    (dolist (package (mapcar #'car package-alist))
+      (let ((in-archive (get-version package package-archive-contents))
+            (new-package (cadr (assq package package-archive-contents)))
+            (old-package (cadr (assq package package-alist))))
+
+        (when (and in-archive
+                   (version-list-< (get-version package package-alist)
+                                   in-archive))
+          (push (list :new new-package :old old-package) updates))))
+    updates))
+
+(defun get-max-package-name-length (updates)
+  (car (sort (mapcar (lambda (it) (length (format "%s" (package-desc-name (plist-get it :new)))))
+                     updates)
+             #'>)))
+
 (setq package-user-dir (expand-file-name "~/.emacs.d/.local/packages/elpa"))
 
 (require 'package)
@@ -27,47 +50,29 @@
   (package-initialize)
   (package-refresh-contents))
 
-
-(let (upgrades)
-  (cl-flet ((get-version (name where)
-                         (let ((pkg (cadr (assq name where))))
-                           (when pkg
-                             (package-desc-version pkg)))))
-    (dolist (package (mapcar #'car package-alist))
-      (let ((in-archive (get-version package package-archive-contents)))
-        (when (and in-archive
-                   (version-list-< (get-version package package-alist)
-                                   in-archive))
-          (push (cadr (assq package package-archive-contents))
-                upgrades)))))
-  (when upgrades
+(let ((updates (get-available-updates)))
+  (when updates
     (message "\nFound %d Package Update%s:"
-             (length upgrades)
-             (if (= (length upgrades) 1) "" "s"))
-    (let ((max-len
-           (or (car (sort (mapcar (lambda (it) (length (format "%s" (package-desc-name it)))) upgrades) #'>))
-               10)))
-      (dolist (new-package upgrades)
-        (let ((old-package (cadr (assq (package-desc-name new-package)
-                                       package-alist))))
-          (message (format " + %%-%ds %%-%ds -> %%s" (+ max-len 2) 14)
-                   (package-desc-name new-package)
-                   (package-version-join (package-desc-version old-package))
-                   (package-version-join (package-desc-version new-package)))))
+             (length updates)
+             (if (= (length updates) 1) "" "s"))
+    (let ((max-len (get-max-package-name-length updates)))
+      (dolist (update updates)
+        (message (format " + %%-%ds %%-%ds -> %%s" (+ max-len 2) 14)
+                 (package-desc-name (plist-get update :new))
+                 (package-version-join (package-desc-version (plist-get update :old)))
+                 (package-version-join (package-desc-version (plist-get update :new)))))
       (when (y-or-n-p "\nProceed?")
-        (princ "\n")
+        (message "")
         (save-window-excursion
-          (dolist (new-package upgrades)
-            (let ((old-package (cadr (assq (package-desc-name new-package)
-                                           package-alist))))
-              (message "Updating %s" (package-desc-name new-package))
+          (dolist (update updates)
+              (message "Updating %s" (package-desc-name (plist-get update :new)))
               (quiet!
-               (package-install new-package)
-               (package-delete old-package))
-              (message "  \e[32mDONE\e[0m"))))))
-    (message "\nFinished."))
+               (package-install (plist-get update :new))
+               (package-delete (plist-get update :old)))
+              (message "  \e[32mDONE\e[0m"))))
+    (message "\nFinished.")))
 
-  (when (not upgrades)
+  (when (not updates)
     (message "Everything up to date.")))
 
 
