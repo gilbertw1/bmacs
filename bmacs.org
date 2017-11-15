@@ -21,7 +21,6 @@
   - [[#emacs-initialization][Emacs Initialization]]
     - [[#initialization-settings][Initialization Settings]]
     - [[#initialize-and-add-package-sources][Initialize and Add Package Sources]]
-    - [[#setup-auto-compilation][Setup auto compilation]]
     - [[#setup-quelpa][Setup Quelpa]]
   - [[#doom-macros][DOOM! Macros]]
     - [[#after][after!]]
@@ -167,6 +166,7 @@
   - [[#functions][Functions]]
     - [[#file-functions][File Functions]]
     - [[#buffer-functions][Buffer Functions]]
+    - [[#window-functions][Window Functions]]
     - [[#counsel-project-bookmarks][Counsel Project Bookmarks]]
     - [[#random-functions][Random Functions]]
   - [[#keybindings][Keybindings]]
@@ -347,8 +347,9 @@ We're going to set the load path ourselves so that we don't have to call =packag
 runtime and incur a large performance hit.
 
 #+BEGIN_SRC emacs-lisp
-  (eval-and-compile
-    (setq load-path (append load-path (directory-files package-user-dir t "^[^.]" t))))
+  (setq load-path
+    (eval-when-compile
+      (append load-path (directory-files package-user-dir t "^[^.]" t))))
 #+END_SRC
 
 Next we are going to require =package.el= and add our additional package archives, 'melpa' and 'org'.
@@ -388,39 +389,29 @@ Add the package directory =mu4e= to the load path.
     (add-to-list 'load-path "/usr/share/emacs/site-lisp/mu4e"))
 #+END_SRC
 
-*** Setup auto compilation
-
-Auto compile any non-compiled lisp file before it is loaded.
-
-#+BEGIN_SRC emacs-lisp
-(use-package auto-compile
-  :demand t
-  :config (auto-compile-on-load-mode))
-#+END_SRC
-
-
 *** Setup Quelpa
 
 Not currently using quelpa, so not enabled.
 
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC emacs-lisp :tangle no
 
-  ;; (setq quelpa-checkout-melpa-p nil
-  ;;       quelpa-update-melpa-p nil
-  ;;       quelpa-melpa-recipe-stores nil
-  ;;       quelpa-self-upgrade-p nil
-  ;;       quelpa-dir (expand-file-name "quelpa" bmacs-packages-dir))
+  (setq quelpa-checkout-melpa-p nil
+        quelpa-update-melpa-p nil
+        quelpa-melpa-recipe-stores nil
+        quelpa-self-upgrade-p nil
+        quelpa-dir (expand-file-name "quelpa" bmacs-packages-dir)
+        quelpa-update-melpa-p nil)
 
-  ;; (setq quelpa-update-melpa-p nil)
-  ;; (unless (require 'quelpa nil t)
-  ;;   (with-temp-buffer
-  ;;     (url-insert-file-contents "http://raw.github.com/quelpa/quelpa/master/bootstrap.el")
-  ;;     (eval-buffer))
-  ;;   (quelpa
-  ;;  '(quelpa-use-package
-  ;;    :fetcher github
-  ;;    :repo "quelpa/quelpa-use-package")))
-  ;; (require 'quelpa-use-package)
+  (eval-when-compile
+    (unless (require 'quelpa nil t)
+      (with-temp-buffer
+        (url-insert-file-contents "http://raw.github.com/quelpa/quelpa/master/bootstrap.el")
+        (eval-buffer))
+      (quelpa
+     '(quelpa-use-package
+       :fetcher github
+       :repo "quelpa/quelpa-use-package")))
+    (require 'quelpa-use-package))
 #+END_SRC
 
 ** DOOM! Macros
@@ -2013,8 +2004,8 @@ Multiple cursors!
                    (evil-delete-char-without-register . ((:default . evil-mc-execute-default-evil-delete)))
                    (evil-delete-backward-char-without-register . ((:default . evil-mc-execute-default-evil-delete)))
                    (evil-delete-line-without-register . ((:default . evil-mc-execute-default-evil-delete)))
-                   (evil-paste-after-witout-register . ((:default . evil-mc-execute-default-evil-paste)))
-                   (evil-paste-before-witout-register . ((:default . evil-mc-execute-default-evil-paste)))))
+                   (evil-paste-after-without-register . ((:default . evil-mc-execute-default-evil-paste)))
+                   (evil-paste-before-without-register . ((:default . evil-mc-execute-default-evil-paste)))))
       (push commands evil-mc-custom-known-commands))
 
     ;; disable evil-escape in evil-mc; causes unwanted text on invocation
@@ -6803,7 +6794,7 @@ _j_ ↓        	_-_ horizontal	_f_ind files	_J_ X↓
 _k_ ↑        	_z_ undo      	_a_ce 1				_K_ X↑
 _l_ →        	_Z_ reset      	_s_wap				_L_ X→
 _F_ollow		  _D_lt Other   	_S_ave				_m_aximize
-_SPC_ cancel	_o_nly this   	_d_elete			_=_ Balance	
+_SPC_ cancel	_o_nly this   	_d_elete			_=_ Balance
 "
    ("h" windmove-left )
    ("j" windmove-down )
@@ -6849,7 +6840,7 @@ _SPC_ cancel	_o_nly this   	_d_elete			_=_ Balance
           (setq this-command 'winner-undo)))
    ("Z" winner-redo)
    ("SPC" nil))
-    
+
 #+END_SRC
 
 *** Smerge
@@ -7179,6 +7170,20 @@ project."
                  :caller 'bmacs/show-hide-popup-buffer)))))
 #+END_SRC
 
+*** Window Functions
+
+#+BEGIN_SRC emacs-lisp
+(defun bmacs/window-zoom ()
+  "Maximize and isolate the current buffer. Activate again to undo this. If the
+window changes before then, the undo expires."
+  (interactive)
+  (if (and (one-window-p)
+           (assoc ?_ register-alist))
+      (jump-to-register ?_)
+    (window-configuration-to-register ?_)
+    (delete-other-windows)))
+#+END_SRC
+
 *** Counsel Project Bookmarks
 
 #+BEGIN_SRC emacs-lisp
@@ -7417,7 +7422,7 @@ session)."
       :desc "Winner redo"                  :nv "U" #'winner-redo
       :desc "Ace window"                   :nv "W" #'ace-window
       :desc "Manage Windows"               :nv "w" #'bmacs-hydra-window/body
-      :desc "Toggle maximize window"       :nv "m" #'doom/window-zoom)
+      :desc "Toggle maximize window"       :nv "m" #'bmacs/window-zoom)
 
     (:desc "jump"
       :prefix "j"
