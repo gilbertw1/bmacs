@@ -177,6 +177,7 @@
     - [[#adjust-fringe][Adjust Fringe]]
     - [[#update-faces][Update Faces]]
     - [[#mardown-open-comamnd][Mardown Open Comamnd]]
+    - [[#fix-org-popups][Fix Org Popups]]
   - [[#todos-02][Todos]]
 
 ** About this file
@@ -6743,13 +6744,16 @@ Improved help commands
 *** TODO pcre2el
 
 ** Popup Rules
+:LOGBOOK:
+CLOCK: [2017-11-15 Wed 13:17]
+:END:
 
 Let's define a simple function that allows us to easily make any buffer into a popup based on a
 regular expression. This function adds an entry to the `display-buffer-alist` to define constraints
 about how the buffer should be displayed. These constraints define a simple popup behavior.
 
 #+BEGIN_SRC emacs-lisp
-(cl-defun bmacs/make-popup (buffer-rx)
+(cl-defun bmacs/make-popup (buffer-rx &optional (height 0.4))
     (add-to-list 'bmacs-popups buffer-rx)
     (add-to-list 'display-buffer-alist
                  `(,buffer-rx
@@ -6757,7 +6761,7 @@ about how the buffer should be displayed. These constraints define a simple popu
                     display-buffer-in-side-window)
                    (reusable-frames . visible)
                    (side            . bottom)
-                   (window-height   . 0.4))))
+                   (window-height   . ,height))))
 #+END_SRC
 
 Now we're going to create a set of rules based on the buffers we would like to become popups.
@@ -6781,6 +6785,21 @@ Now we're going to create a set of rules based on the buffers we would like to b
 (bmacs/make-popup (rx bos "*Flycheck errors*" eos))
 ;; VC Diff
 (bmacs/make-popup (rx bos "*vc-diff*" eos))
+;; Org Popups
+(bmacs/make-popup (rx bos "*Calendar*" eos))
+(bmacs/make-popup (rx bos "*Org todo*" eos) 0.05)
+(bmacs/make-popup (rx bos "*Org Note*" eos) 0.1)
+(bmacs/make-popup (rx bos "*Org Select*" eos) 0.2)
+(bmacs/make-popup (rx bos "*Org Links*" eos) 0.05)
+(bmacs/make-popup (rx bos "*Org Export Dispatcher*" eos) 0.05)
+(bmacs/make-popup (rx bos "*Org Commands*" eos) 0.05)
+(bmacs/make-popup (rx bos "*Org Agenda") 0.2)
+(bmacs/make-popup (rx bos "*Agenda Commands*" eos) 0.2)
+(bmacs/make-popup (rx bos "*Org Clock*" eos))
+(bmacs/make-popup (rx bos "*Org Src"))
+(bmacs/make-popup (rx bos "*Edit Formulas*" eos) 0.01)
+(bmacs/make-popup (rx bos "*Org-Babel") 0.25)
+(bmacs/make-popup (rx bos "CAPTURE") 0.2)
 #+END_SRC
 
 
@@ -7977,6 +7996,14 @@ Set the various indentations
 (setq markdown-open-command "typora")
 #+END_SRC
 
+
+*** Fix Org Popups
+
+#+BEGIN_SRC emacs-lisp
+(after! org
+  (defun org-switch-to-buffer-other-window (&rest args)
+    (apply #'switch-to-buffer-other-window args)))
+#+END_SRC
 
 ** Todos [0/2]
 
