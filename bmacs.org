@@ -1603,6 +1603,18 @@ I like to prevent evil from yanking text to the clipboard in many scenarios.
                   (nth 3 evil-last-paste)
                   (nth 4 evil-last-paste)
                   t)))))
+(defun +evil/visual-indent ()
+  (interactive)
+  (evil-shift-right (region-beginning) (region-end))
+  (evil-normal-state)
+  (evil-visual-restore))
+
+(defun +evil/visual-dedent ()
+  (interactive)
+  (evil-shift-left (region-beginning) (region-end))
+  (evil-normal-state)
+  (evil-visual-restore))
+
 #+END_SRC
 
 ** Completion
@@ -7223,6 +7235,12 @@ project."
                  :action (lambda (x)
                            (pop-to-buffer x))
                  :caller 'bmacs/show-hide-popup-buffer)))))
+
+(defun bmacs/toggle-whitespace ()
+  (interactive)
+  (if (and (boundp 'whitespace-mode) whitespace-mode)
+      (whitespace-mode -1)
+    (whitespace-mode +1)))
 #+END_SRC
 
 *** Window Functions
@@ -7529,7 +7547,7 @@ session)."
      :desc "Indent guides (column)"        :nv "I" #'highlight-indentation-current-column-mode
      :desc "Evil goggles"                  :nv "g" #'+evil-goggles/toggle
      :desc "Visual line wrapping"          :nv "v" #'visual-line-mode
-     :desc "Whitespace mode"               :nv "w" #'gdoom/toggle-whitespace)
+     :desc "Whitespace mode"               :nv "w" #'bmacs/toggle-whitespace)
 
    (:desc "text"
      :prefix "t"
