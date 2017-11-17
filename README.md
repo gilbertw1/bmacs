@@ -37,15 +37,15 @@ Run
 
 ### Make Commands
 
-`clean`: Delete compiled files
+**clean**: Delete compiled files
 
     make clean
 
-`compile`: Byte compile for performance (Recompile required when new changes are made)
+**compile**: Byte compile for performance (Recompile required when new changes are made**
 
     make compile
 
-`update.sh`: Update Packages
+**update**: Update Packages
 
     make update
 

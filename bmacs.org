@@ -353,7 +353,7 @@ tell =package.el= to not automatically call it on our behalf. Additionally we're
   (eval-and-compile
     (setq package-user-dir (expand-file-name "elpa" bmacs-packages-dir)))
 
-  (setq load-prefer-newer t
+  (setq load-prefer-newer noninteractive
         package--init-file-ensured t
         package-enable-at-startup nil)
 #+END_SRC
@@ -1630,7 +1630,30 @@ Awesome visual search utility
 Making everything all ivy-ed up.
 
 #+BEGIN_SRC emacs-lisp
-(use-package counsel-projectile)
+(use-package counsel-projectile
+  :config
+  (defun counsel-projectile-rg-initial (&optional value)
+    "Ivy version of `projectile-rg'."
+    (interactive)
+    (if (projectile-project-p)
+          (counsel-rg value
+                      (projectile-project-root)
+                      nil
+                      (projectile-prepend-project-name "rg"))
+    (user-error "You're not in a project")))
+  
+  (defun counsel-projectile-rg-region-or-symbol ()
+    "Use `counsel-rg' to search for the selected region or
+ the symbol around point in the current project with git grep."
+    (interactive)
+    (let ((input (if (region-active-p)
+      (buffer-substring-no-properties
+        (region-beginning) (region-end))
+        (thing-at-point 'symbol t))))
+      (if (projectile-project-p)
+        (counsel-projectile-rg-initial input)
+        (counsel-rg input)))))
+
 (use-package counsel
   :demand t
   :config
@@ -2281,7 +2304,6 @@ Check syntax!
 *** Magit
 
 #+BEGIN_SRC emacs-lisp
-;; TODO
 (use-package magit
   :commands (magit-status magit-blame magit-log-buffer-file)
   :config
@@ -4153,10 +4175,14 @@ It's org-mode ya'll
 **** Configuration
 
 #+BEGIN_SRC emacs-lisp
-  ;; Ensure ELPA org is prioritized above built-in org.
-  (when-let ((path (locate-library "org" nil load-path)))
-    (setq load-path (delete path load-path))
-    (push (file-name-directory path) load-path))
+
+(use-package org
+  :ensure org-plus-contrib
+  :pin org
+  :defer t)
+
+;; Ensure ELPA org is prioritized above built-in org.
+(setq load-path (remove-if (lambda (x) (string-match-p "org$" x)) load-path))
 
 ;; Custom variables
 (defvar +borg-dir (expand-file-name "~/org/")

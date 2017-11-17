@@ -74,5 +74,3 @@
 
   (when (not updates)
     (message "Everything up to date.")))
-
-
