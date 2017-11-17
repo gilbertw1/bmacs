@@ -7097,6 +7097,7 @@ _SPC_ cancel	_o_nly this   	_d_elete			_=_ Balance
             (call-interactively #'projectile-invalidate-cache))
           (message "File '%s' successfully removed" filename)))))
 
+  ;; TODO: properly handle ssh hostnames formatted user@host
   (defun bmacs/sudo-edit (&optional arg)
     (interactive "P")
     (let ((fname (if (or arg (not buffer-file-name))
@@ -7109,7 +7110,7 @@ _SPC_ cancel	_o_nly this   	_d_elete			_=_ Balance
                 (search-backward ":")
                 (let ((last-match-end nil)
                       (last-ssh-hostname nil))
-                  (while (string-match "@\\\([^:|]+\\\)" fname last-match-end)
+                  (while (string-match "ssh:\\\([^:|]+\\\)" fname last-match-end)
                     (setq last-ssh-hostname (or (match-string 1 fname)
                                                 last-ssh-hostname))
                     (setq last-match-end (match-end 0)))
