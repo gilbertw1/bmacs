@@ -2305,7 +2305,7 @@ Check syntax!
 
 #+BEGIN_SRC emacs-lisp
 (use-package magit
-  :commands (magit-status magit-blame magit-log-buffer-file)
+  :commands (magit-status magit-blame magit-log-buffer-file magit-file-popup magit-log-all)
   :config
   (map! :map magit-mode-map
         "SPC" nil))
@@ -4222,6 +4222,7 @@ It's org-mode ya'll
   (org-indent-mode +1)
   (bmacs|disable-line-numbers)
   (setq-local company-idle-delay nil)
+  (undo-tree-mode +1)
 
   ;; show-paren-mode causes problems for org-indent-mode, so disable it
   (set (make-local-variable 'show-paren-mode) nil))
@@ -4310,10 +4311,10 @@ between the two."
           :nv "j"   #'evil-next-visual-line
           :nv "k"   #'evil-previous-visual-line
 
-          :ni [M-return]   (lambda () (+borg/insert-item 'below))
-          :ni [S-M-return] (lambda () (+borg/insert-item 'above))
-          :ni [C-return]   (lambda () (+borg/insert-item 'below))
-          :ni [S-C-return] (lambda () (+borg/insert-item 'above))
+          :ni [M-return]   (λ! (+borg/insert-item 'below))
+          :ni [S-M-return] (λ! (+borg/insert-item 'above))
+          :ni [C-return]   (λ! (+borg/insert-item 'below))
+          :ni [S-C-return] (λ! (+borg/insert-item 'above))
 
           :ni "M-SPC" #'org-cycle
 
@@ -5023,9 +5024,8 @@ Quick and awesome documentation lookup
 
 #+BEGIN_SRC emacs-lisp
 (use-package counsel-dash
-  :after counsel
-  :config
-  (setq counsel-dash-docsets-path (concat bmacs-etc-dir "docsets"))
+  :commands (counsel-dash counsel-dash-install-docset)
+  :init
   ;; Language Hooks
   (add-hook 'emacs-lisp-mode-hook (lambda () (setq-local counsel-dash-docsets '("Emacs Lisp"))))
   (add-hook 'scala-mode-hook (lambda () (setq-local counsel-dash-docsets '("Scala" "Akka" "Play_Scala" "Java"))))
@@ -5039,7 +5039,10 @@ Quick and awesome documentation lookup
   (add-hook 'js2-mode-hook (lambda () (setq-local counsel-dash-docsets '("JavaScript"))))
   (add-hook 'js-mode-hook (lambda () (setq-local counsel-dash-docsets '("JavaScript"))))
   (add-hook 'html-mode-hook (lambda () (setq-local counsel-dash-docsets '("HTML" "Javascript"))))
-  (add-hook 'python-mode-hook (lambda () (setq-local counsel-dash-docsets '("Python 3")))))
+  (add-hook 'python-mode-hook (lambda () (setq-local counsel-dash-docsets '("Python 3"))))
+
+  :config
+  (setq counsel-dash-docsets-path (concat bmacs-etc-dir "docsets")))
 #+END_SRC
 
 *** Dired
@@ -7539,7 +7542,7 @@ session)."
       :desc "Git status"                   :nv "s" #'magit-status
       :desc "Git blame"                    :nv "b" #'magit-blame
       :desc "Git time machine"             :nv "t" #'git-timemachine
-      :desc "Git log current file"         :nv "f" #'magit-log-buffer-file
+      :desc "Git log current file"         :nv "f" #'magit-file-popup
       :desc "Git log all"                  :nv "l" #'magit-log-all
       :desc "Smerge Hydra"                 :nv "m" #'bmacs-hydra-smerge/body
       :desc "Show and copy git link"       :nv "y" #'git-link
