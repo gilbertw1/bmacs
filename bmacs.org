@@ -7287,7 +7287,10 @@ project."
                  derived-p
                  (functionp mode))
         (funcall mode))
-      (if text (insert text)))
+      (when text
+          (end-of-buffer)
+          (newline)
+          (insert text)))
     (pop-to-buffer "*scratch*")))
 #+END_SRC
 
