@@ -1641,7 +1641,7 @@ Making everything all ivy-ed up.
                       nil
                       (projectile-prepend-project-name "rg"))
     (user-error "You're not in a project")))
-  
+
   (defun counsel-projectile-rg-region-or-symbol ()
     "Use `counsel-rg' to search for the selected region or
  the symbol around point in the current project with git grep."
@@ -3935,241 +3935,242 @@ It's org-mode ya'll
 **** Functions
 
 #+BEGIN_SRC emacs-lisp
-  (defun +borg/open-organizer ()
-    "Open the default organizer"
-    (interactive)
-    (find-file +borg-organizer))
+(defun +borg/open-organizer ()
+  "Open the default organizer"
+  (interactive)
+  (find-file +borg-organizer))
 
-  (define-minor-mode +org-pretty-mode
-    "TODO"
-    :init-value nil
-    :lighter " *"
-    :group 'evil-org
-    (setq org-hide-emphasis-markers +org-pretty-mode)
-    (org-toggle-pretty-entities)
-    (org-with-silent-modifications
-     ;; In case the above un-align tables
-     (org-table-map-tables 'org-table-align t)))
+(define-minor-mode +org-pretty-mode
+  "TODO"
+  :init-value nil
+  :lighter " *"
+  :group 'evil-org
+  (setq org-hide-emphasis-markers +org-pretty-mode)
+  (org-toggle-pretty-entities)
+  (org-with-silent-modifications
+   ;; In case the above un-align tables
+   (org-table-map-tables 'org-table-align t)))
 
-  (defun +borg|realign-table-maybe ()
-    "Auto-align table under cursor and re-calculate formulas."
-    (when (org-at-table-p)
-      (save-excursion
-        (quiet! (org-table-recalculate)))))
+(defun +borg|realign-table-maybe ()
+  "Auto-align table under cursor and re-calculate formulas."
+  (when (org-at-table-p)
+    (save-excursion
+      (quiet! (org-table-recalculate)))))
 
-  (defun +borg|update-cookies ()
-    "Update counts in headlines (aka \"cookies\")."
-    (when (and buffer-file-name (file-exists-p buffer-file-name))
-      (org-update-statistics-cookies t)))
+(defun +borg|update-cookies ()
+  "Update counts in headlines (aka \"cookies\")."
+  (when (and buffer-file-name (file-exists-p buffer-file-name))
+    (org-update-statistics-cookies t)))
 
-   (defun +borg/dwim-at-point ()
-    "Do-what-I-mean at point. This includes following timestamp links, aligning
+(defun +borg/dwim-at-point ()
+  "Do-what-I-mean at point. This includes following timestamp links, aligning
   tables, toggling checkboxes/todos, executing babel blocks, previewing latex
   fragments, opening links, or refreshing images."
-    (interactive)
-    (let* ((scroll-pt (window-start))
-           (context (org-element-context))
-           (type (org-element-type context)))
-      (cond
-       ((memq type '(planning timestamp))
-        (org-follow-timestamp-link))
+  (interactive)
+  (let* ((scroll-pt (window-start))
+         (context (org-element-context))
+         (type (org-element-type context)))
+    (cond
+     ((memq type '(planning timestamp))
+      (org-follow-timestamp-link))
 
-       ((memq type '(table table-row))
-        (if (org-element-property :tblfm (org-element-property :parent context))
-            (org-table-recalculate t)
-          (org-table-align)))
+     ((memq type '(table table-row))
+      (if (org-element-property :tblfm (org-element-property :parent context))
+          (org-table-recalculate t)
+        (org-table-align)))
 
-       ((org-element-property :checkbox (org-element-lineage context '(item) t))
-        (let ((match (and (org-at-item-checkbox-p) (match-string 1))))
-          (org-toggle-checkbox (if (equal match "[ ]") '(16)))))
+     ((org-element-property :checkbox (org-element-lineage context '(item) t))
+      (let ((match (and (org-at-item-checkbox-p) (match-string 1))))
+        (org-toggle-checkbox (if (equal match "[ ]") '(16)))))
 
-       ((and (eq type 'headline)
-             (string= "ARCHIVE" (car-safe (org-get-tags))))
-        (org-force-cycle-archived))
+     ((and (eq type 'headline)
+           (string= "ARCHIVE" (car-safe (org-get-tags))))
+      (org-force-cycle-archived))
 
-       ((eq type 'headline)
-        (org-todo
-         (cond
-          ((eq (org-element-property :todo-type context) 'done) 'none)
-          ((eq (org-element-property :todo-type context) 'todo) 'done)
-          (t 'todo))))
+     ((eq type 'headline)
+      (org-todo
+       (cond
+        ((eq (org-element-property :todo-type context) 'done) 'none)
+        ((eq (org-element-property :todo-type context) 'todo) 'done)
+        (t 'todo))))
 
-       ((org-element-property :bullet (org-element-lineage context '(item) t))
-        (+borg/toggle-checkbox))
+     ((org-element-property :bullet (org-element-lineage context '(item) t))
+      (+borg/toggle-checkbox))
 
-       ((eq type 'babel-call)
-        (org-babel-lob-execute-maybe))
+     ((eq type 'babel-call)
+      (org-babel-lob-execute-maybe))
 
-       ((memq type '(src-block inline-src-block))
-        (org-babel-execute-src-block))
+     ((memq type '(src-block inline-src-block))
+      (org-babel-execute-src-block))
 
-       ((memq type '(latex-fragment latex-environment))
-        (org-toggle-latex-fragment))
+     ((memq type '(latex-fragment latex-environment))
+      (org-toggle-latex-fragment))
 
-       ((eq type 'link)
-        (let ((path (org-element-property :path (org-element-lineage context '(link) t))))
-          (if (and path (image-type-from-file-name path))
-              (+borg/refresh-inline-images)
-            (org-open-at-point))))
+     ((eq type 'link)
+      (let ((path (org-element-property :path (org-element-lineage context '(link) t))))
+        (if (and path (image-type-from-file-name path))
+            (+borg/refresh-inline-images)
+          (org-open-at-point))))
 
-       (t (+borg/refresh-inline-images)))
-      (set-window-start nil scroll-pt)))
+     (t (+borg/refresh-inline-images)))
+    (set-window-start nil scroll-pt)))
 
-  (defun +borg/indent ()
-    "Indent the current item (header or item). Otherwise, forward to
+(defun +borg/indent ()
+  "Indent the current item (header or item). Otherwise, forward to
   `self-insert-command'."
-    (interactive)
-    (cond ((org-at-item-p)
-           (org-indent-item-tree))
-          ((org-at-heading-p)
-           (ignore-errors (org-demote)))
-          ((org-in-src-block-p t)
-           (doom/dumb-indent)) ; TODO dumb-indent
-          (t
-           (call-interactively #'self-insert-command))))
+  (interactive)
+  (cond ((org-at-item-p)
+         (org-indent-item-tree))
+        ((org-at-heading-p)
+         (ignore-errors (org-demote)))
+        ((org-in-src-block-p t)
+         (doom/dumb-indent)) ; TODO dumb-indent
+        (t
+         (call-interactively #'self-insert-command))))
 
-  (defun +borg/indent-or-next-field-or-yas-expand ()
-    "Depending on the context either a) indent the current line, b) go the next
+(defun +borg/indent-or-next-field-or-yas-expand ()
+  "Depending on the context either a) indent the current line, b) go the next
   table field or c) run `yas-expand'."
-    (interactive)
-    (call-interactively
-     (cond ((and (bound-and-true-p yas-minor-mode)
-                 (yas--templates-for-key-at-point))
-            #'yas-expand)
-           ((org-at-table-p)
-            #'org-table-next-field)
-           (t
-            #'+borg/indent))))
+  (interactive)
+  (call-interactively
+   (cond ((and (bound-and-true-p yas-minor-mode)
+               (yas--templates-for-key-at-point))
+          #'yas-expand)
+         ((org-at-table-p)
+          #'org-table-next-field)
+         (t
+          #'+borg/indent))))
 
-  (defun +borg/dedent ()
-    "Dedent the current item (header or item). Otherwise, forward to
+(defun +borg/dedent ()
+  "Dedent the current item (header or item). Otherwise, forward to
   `self-insert-command'."
-    (interactive)
-    (cond ((org-at-item-p)
-           (org-list-indent-item-generic
-            -1 nil
-            (save-excursion
-              (when (org-region-active-p)
-                (goto-char (region-beginning)))
-              (org-list-struct))))
-          ((org-at-heading-p)
-           (ignore-errors (org-promote)))
-          (t
-           (call-interactively #'self-insert-command))))
+  (interactive)
+  (cond ((org-at-item-p)
+         (org-list-indent-item-generic
+          -1 nil
+          (save-excursion
+            (when (org-region-active-p)
+              (goto-char (region-beginning)))
+            (org-list-struct))))
+        ((org-at-heading-p)
+         (ignore-errors (org-promote)))
+        (t
+         (call-interactively #'self-insert-command))))
 
-  (defun +borg/dedent-or-prev-field ()
-    "Depending on the context either dedent the current item or go the previous
+(defun +borg/dedent-or-prev-field ()
+  "Depending on the context either dedent the current item or go the previous
   table field."
-    (interactive)
-    (call-interactively
-     (if (org-at-table-p)
-         #'org-table-previous-field
-       #'+borg/dedent)))
+  (interactive)
+  (call-interactively
+   (if (org-at-table-p)
+       #'org-table-previous-field
+     #'+borg/dedent)))
 
-  (defun +borg/insert-item (direction)
-    "Inserts a new heading, table cell or item, depending on the context.
+(defun +borg/insert-item (direction)
+  "Inserts a new heading, table cell or item, depending on the context.
   DIRECTION can be 'above or 'below.
 
   I use this instead of `org-insert-item' or `org-insert-heading' which are too
   opinionated and perform this simple task incorrectly (e.g. whitespace in the
   wrong places)."
-    (interactive)
-    (let* ((context (org-element-lineage
-                     (org-element-context)
-                     '(table table-row headline inlinetask item plain-list)
-                     t))
-           (type (org-element-type context)))
-      (cond ((eq type 'item)
-             (let ((marker (org-element-property :bullet context))
-                   (pad (save-excursion
-                          (back-to-indentation)
-                          (- (point) (line-beginning-position)))))
-               (pcase direction
-                 ('below
-                  (goto-char (line-end-position))
-                  (insert (concat  "\n" (make-string pad ? ) marker)))
-                 ('above
-                  (goto-char (line-beginning-position))
-                  (insert (make-string pad ? ) marker)
-                  (save-excursion (insert "\n")))))
-             (when (org-element-property :checkbox context)
-               (insert "[ ] ")))
-
-            ((memq type '(table table-row))
+  (interactive)
+  (let* ((context (org-element-lineage
+                   (org-element-context)
+                   '(table table-row headline inlinetask item plain-list)
+                   t))
+         (type (org-element-type context)))
+    (cond ((eq type 'item)
+           (let ((marker (org-element-property :bullet context))
+                 (pad (save-excursion
+                        (back-to-indentation)
+                        (- (point) (line-beginning-position)))))
              (pcase direction
-               ('below (org-table-insert-row t))
-               ('above (+borg/table-prepend-row-or-shift-up))))
+               ('below
+                (goto-char (line-end-position))
+                (insert (concat  "\n" (make-string pad ? ) marker)))
+               ('above
+                (goto-char (line-beginning-position))
+                (insert (make-string pad ? ) marker)
+                (save-excursion (insert "\n")))))
+           (when (org-element-property :checkbox context)
+             (insert "[ ] ")))
 
-            ((memq type '(headline inlinetask plain-list))
-             (let* ((subcontext (org-element-context))
-                    (level (save-excursion
-                             (org-back-to-heading)
-                             (org-element-property
-                              :level
-                              (if (eq (org-element-type subcontext) 'headline)
-                                  subcontext
-                                1)))))
-               (pcase direction
-                 ('below
-                  (let ((at-eol (= (point) (1- (line-end-position)))))
-                    (goto-char (line-end-position))
-                    (org-end-of-subtree)
-                    (insert (concat "\n"
-                                    (when (= level 1)
-                                      (if at-eol
-                                          (ignore (cl-incf level))
-                                        "\n"))
-                                    (make-string level ?*)
-                                    " "))))
-                 ('above
-                  (org-back-to-heading)
-                  (org-insert-heading)
-                  (when (= level 1)
-                    (save-excursion (evil-open-above 1))
-                    (save-excursion (insert "\n")))))
-               (when (org-element-property :todo-type context)
-                 (org-todo 'todo))))
+          ((memq type '(table table-row))
+           (pcase direction
+             ('below (org-table-insert-row t))
+             ('above (+borg/table-prepend-row-or-shift-up))))
 
-            (t (user-error "Not a valid list, heading or table")))
+          ((memq type '(headline inlinetask plain-list))
+           (let* ((subcontext (org-element-context))
+                  (level (save-excursion
+                           (org-back-to-heading)
+                           (org-element-property
+                            :level
+                            (if (eq (org-element-type subcontext) 'headline)
+                                subcontext
+                              1)))))
+             (pcase direction
+               ('below
+                (let ((at-eol (= (point) (1- (line-end-position)))))
+                  (goto-char (line-end-position))
+                  (org-end-of-subtree)
+                  (insert (concat "\n"
+                                  (when (= level 1)
+                                    (if at-eol
+                                        (ignore (cl-incf level))
+                                      "\n"))
+                                  (make-string level ?*)
+                                  " "))))
+               ('above
+                (org-back-to-heading)
+                (org-insert-heading)
+                (when (= level 1)
+                  (save-excursion (evil-open-above 1))
+                  (save-excursion (insert "\n")))))
+             (when (org-element-property :todo-type context)
+               (org-todo 'todo))))
 
-      (when (bound-and-true-p evil-mode)
-        (evil-append-line 1))))
+          (t (user-error "Not a valid list, heading or table")))
 
-  (defun +org-get-property (name &optional _file) ; TODO Add FILE
-    "Get a propery from an org file."
-    (save-excursion
-      (goto-char 1)
-      (re-search-forward (format "^#\\+%s:[ \t]*\\([^\n]+\\)" (upcase name)) nil t)
-      (buffer-substring-no-properties (match-beginning 1) (match-end 1))))
+    (when (bound-and-true-p evil-mode)
+      (evil-append-line 1))))
 
-  (defun +borg/refresh-inline-images ()
-    "Refresh image previews in the current heading/tree."
-    (interactive)
-    (if (> (length org-inline-image-overlays) 0)
-        (org-remove-inline-images)
-      (org-display-inline-images
-       t t
-       (if (org-before-first-heading-p)
-           (line-beginning-position)
-         (save-excursion (org-back-to-heading) (point)))
-       (if (org-before-first-heading-p)
-           (line-end-position)
-         (save-excursion (org-end-of-subtree) (point))))))
+(defun +org-get-property (name &optional _file) ; TODO Add FILE
+  "Get a propery from an org file."
+  (save-excursion
+    (goto-char 1)
+    (re-search-forward (format "^#\\+%s:[ \t]*\\([^\n]+\\)" (upcase name)) nil t)
+    (buffer-substring-no-properties (match-beginning 1) (match-end 1))))
 
-  (defun +borg/toggle-checkbox ()
-    "Toggle the presence of a checkbox in the current item."
-    (interactive)
-    (org-toggle-checkbox '(4)))
+(defun +borg/refresh-inline-images ()
+  "Refresh image previews in the current heading/tree."
+  (interactive)
+  (if (> (length org-inline-image-overlays) 0)
+      (org-remove-inline-images)
+    (org-display-inline-images
+     t t
+     (if (org-before-first-heading-p)
+         (line-beginning-position)
+       (save-excursion (org-back-to-heading) (point)))
+     (if (org-before-first-heading-p)
+         (line-end-position)
+       (save-excursion (org-end-of-subtree) (point))))))
 
-  (defun +borg/org-file-is-large-p ()
+(defun +borg/toggle-checkbox ()
+  "Toggle the presence of a checkbox in the current item."
+  (interactive)
+  (org-toggle-checkbox '(4)))
+
+(defun +borg/org-file-is-large-p ()
+  (when (buffer-file-name)
     (let* ((filename (buffer-file-name))
            (size (nth 7 (file-attributes filename))))
-      (> (* 1024 size) +borg-large-file-size)))
+      (> (* 1024 size) +borg-large-file-size))))
 
-  (defun +borg/org-load-hook (func &optional append)
-    (if (featurep 'org)
+(defun +borg/org-load-hook (func &optional append)
+  (if (featurep 'org)
       (add-hook 'bmacs-post-init-hook func append)
-     (add-hook 'org-load-hook func append)))
+    (add-hook 'org-load-hook func append)))
 #+END_SRC
 
 **** Configuration
@@ -4215,7 +4216,6 @@ It's org-mode ya'll
 
   (unless (+borg/org-file-is-large-p)
     (add-hook 'before-save-hook #'+borg|update-cookies nil t))
-
   ;;
   (setq line-spacing 1)
   (visual-line-mode +1)
@@ -4223,6 +4223,7 @@ It's org-mode ya'll
   (bmacs|disable-line-numbers)
   (setq-local company-idle-delay nil)
   (undo-tree-mode +1)
+  (setq-local evil-auto-indent nil)
 
   ;; show-paren-mode causes problems for org-indent-mode, so disable it
   (set (make-local-variable 'show-paren-mode) nil))
@@ -4299,6 +4300,7 @@ between the two."
 
         (:map +org-evil-mode-map
           :n "RET" #'+borg/dwim-at-point
+          :i "RET" #'evil-ret
           ;; Navigate table cells
           :i  "M-l"   #'+borg/table-next-field
           :i  "M-h"   #'+borg/table-previous-field
@@ -4426,8 +4428,7 @@ between the two."
   (setq org-src-fontify-natively t      ; make code pretty
         org-src-preserve-indentation t  ; use native major-mode indentation
         org-src-tab-acts-natively t
-        org-src-window-setup 'current-window
-        org-confirm-babel-evaluate nil) ; you don't need my permission
+        org-src-window-setup 'current-window)
 
   (org-babel-do-load-languages
    'org-babel-load-languages
@@ -4452,15 +4453,6 @@ between the two."
              sql-mode   ; ob-sql-mode
              translate  ; ob-translate
              )))
-
-  ;; In a recent update, `org-babel-get-header' was removed from org-mode, which
-  ;; is something a fair number of babel plugins use. So until those plugins
-  ;; update, this polyfill will do:
-  (defun org-babel-get-header (params key &optional others)
-    (cl-loop with fn = (if others #'not #'identity)
-             for p in params
-             if (funcall fn (eq (car p) key))
-             collect p))
 
   ;; I prefer C-c C-c for confirming over the default C-c '
   (map! :map org-src-mode-map "C-c C-c" #'org-edit-src-exit)
@@ -6785,9 +6777,6 @@ Improved help commands
 *** TODO pcre2el
 
 ** Popup Rules
-:LOGBOOK:
-CLOCK: [2017-11-15 Wed 13:17]
-:END:
 
 Let's define a simple function that allows us to easily make any buffer into a popup based on a
 regular expression. This function adds an entry to the `display-buffer-alist` to define constraints
@@ -7158,12 +7147,6 @@ _SPC_ cancel	_o_nly this   	_d_elete			_=_ Balance
       (end-of-line)
       (hs-toggle-hiding)))
 
-  (defun bmacs/toggle-whitespace ()
-    (interactive)
-    (if (and (boundp 'whitespace-mode) whitespace-mode)
-        (whitespace-mode -1)
-      (whitespace-mode +1)))
-
   (defun bmacs/sudo-find-file (file)
     "Open a file as root."
     (interactive
@@ -7202,13 +7185,17 @@ project."
     (when (called-interactively-p 'interactive)
       (message "Killed %s buffers" (length buffers)))))
 
- (defun bmacs//get-buffer-display-time (buffer)
+ (defun bmacs//get-buffer-display-time (buffer start-time)
    (with-current-buffer buffer
-     (float-time buffer-display-time)))
+     (let ((buffer-time (float-time buffer-display-time)))
+       (if (< start-time buffer-time)
+           0
+         buffer-time))))
 
  (defun bmacs/show-hide-popup-buffer (&optional select buffer-rx)
    (interactive)
-   (let ((open-popup-buffers
+   (let ((start-time (float-time (current-time)))
+         (open-popup-buffers
            (if buffer-rx
              (seq-filter
                (lambda (buff)
@@ -7243,7 +7230,7 @@ project."
                  (sort
                    open-popup-buffers
                    #'(lambda (a b)
-                     (> (bmacs//get-buffer-display-time a) (bmacs//get-buffer-display-time b))))))))
+                     (> (bmacs//get-buffer-display-time a start-time) (bmacs//get-buffer-display-time b start-time))))))))
          ((> 0 (length open-popup-buffers))
            (ivy-read "Close popup: "
                  (mapcar #'buffer-name open-popup-buffers)
@@ -7260,10 +7247,11 @@ project."
                (sort
                  closed-popup-buffers
                  #'(lambda (a b)
-                   (> (bmacs//get-buffer-display-time a) (bmacs//get-buffer-display-time b)))))))
+                   (> (bmacs//get-buffer-display-time a start-time) (bmacs//get-buffer-display-time b start-time)))))))
          (t
           (ivy-read "Open popup: "
                  (mapcar #'buffer-name closed-popup-buffers)
+                 :require-match t
                  :action (lambda (x)
                            (pop-to-buffer x))
                  :caller 'bmacs/show-hide-popup-buffer)))))
@@ -7288,10 +7276,11 @@ project."
                  (functionp mode))
         (funcall mode))
       (when text
-          (end-of-buffer)
-          (newline)
-          (insert text)))
-    (pop-to-buffer "*scratch*")))
+        (when (> (buffer-size) 0)
+          (goto-char (point-max))
+          (newline))
+        (insert text))
+      (pop-to-buffer "*scratch*"))))
 #+END_SRC
 
 *** Window Functions
