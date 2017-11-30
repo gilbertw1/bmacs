@@ -41,7 +41,7 @@ Run
 
     make clean
 
-**compile**: Byte compile for performance (Recompile required when new changes are made**
+**compile**: Byte compile for performance (Recompile required when new changes are made)
 
     make compile
 

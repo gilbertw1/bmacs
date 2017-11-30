@@ -6841,6 +6841,8 @@ Now we're going to create a set of rules based on the buffers we would like to b
 (bmacs/make-popup (rx bos "*Edit Formulas*" eos) 0.01)
 (bmacs/make-popup (rx bos "*Org-Babel") 0.25)
 (bmacs/make-popup (rx bos "CAPTURE") 0.2)
+;; Scratch Buffer
+(bmacs/make-popup (rx bos "*scratch*" eos) 0.4)
 #+END_SRC
 
 
@@ -7271,6 +7273,22 @@ project."
   (if (and (boundp 'whitespace-mode) whitespace-mode)
       (whitespace-mode -1)
     (whitespace-mode +1)))
+
+(defun bmacs/scratch-buffer ()
+  (interactive)
+  (let ((text (and (region-active-p)
+                   (buffer-substring-no-properties
+                    (region-beginning) (region-end))))
+        (mode major-mode)
+        (derived-p (derived-mode-p 'prog-mode 'text-mode))
+        (scratch-buffer (get-buffer-create "*scratch*")))
+    (with-current-buffer scratch-buffer
+      (when (and (not (eq major-mode mode))
+                 derived-p
+                 (functionp mode))
+        (funcall mode))
+      (if text (insert text)))
+    (pop-to-buffer "*scratch*")))
 #+END_SRC
 
 *** Window Functions
@@ -7467,7 +7485,7 @@ session)."
       :desc "Kill other buffers"             :nv "D" (λ! (bmacs/kill-other-buffers t))
       :desc "Kill a buffer"                  :nv "k" #'kill-buffer
       :desc "New empty buffer"               :nv "n" #'evil-buffer-new
-      ;; :desc "Scratch buffer"                 :nv "s" #'doom/open-scratch-buffer TODO
+      :desc "Scratch buffer"                 :nv "s" #'bmacs/scratch-buffer
       ;; TODO spacemacs/copy-whole-buffer-to-clipboard y
       ;; TODO spacemacs/paste-whole-file-to-clipboard p
       )
