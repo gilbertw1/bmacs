@@ -39,6 +39,7 @@
     - [[#ui][UI]]
     - [[#editor][Editor]]
     - [[#font-1][Font]]
+    - [[#help][Help]]
     - [[#operating-system-specific][Operating System Specific]]
   - [[#core-packages][Core Packages]]
     - [[#which-key][which-key]]
@@ -1128,6 +1129,13 @@ fundamental-mode) for performance sake."
 (set-face-attribute 'default nil :font bmacs-font)
 #+END_SRC
 
+
+*** Help
+When opening a help window, always select that window afterwards and move focus to it.
+
+#+BEGIN_SRC emacs-lisp
+(setq help-window-select t)
+#+END_SRC
 
 *** Operating System Specific
 
