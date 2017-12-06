@@ -386,8 +386,14 @@ previously compiled manually then all of the package initialization will still t
 
     (unless (assoc-default "melpa" package-archives)
       (add-to-list 'package-archives '("melpa" . "http://melpa.org/packages/") t))
+    (unless (assoc-default "melpa-stable" package-archives)
+      (add-to-list 'package-archives '("melpa-stable" . "https://stable.melpa.org/packages/") t))
     (unless (assoc-default "org" package-archives)
       (add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t))
+
+    (setq package-pinned-packages
+      '((use-package . "melpa-stable")
+        (evil . "melpa-stable")))
 
     (package-initialize)
     (unless (package-installed-p 'use-package)
@@ -775,18 +781,18 @@ A simple macro that prevents code from making any noise
   "Run FORMS without making any noise."
   `(if nil
        (progn ,@forms)
-     (fset 'doom--old-write-region-fn (symbol-function 'write-region))
-     (cl-letf ((standard-output (lambda (&rest _)))
-               ((symbol-function 'load-file) (lambda (file) (load file nil t)))
-               ((symbol-function 'message) (lambda (&rest _)))
-               ((symbol-function 'write-region)
-                (lambda (start end filename &optional append visit lockname mustbenew)
-                  (unless visit (setq visit 'no-message))
-                  (doom--old-write-region-fn
-                   start end filename append visit lockname mustbenew)))
-               (inhibit-message t)
-               (save-silently t))
-       ,@forms)))
+ (fset 'doom--old-write-region-fn (symbol-function 'write-region))
+      (cl-letf ((standard-output (lambda (&rest _)))
+                ((symbol-function 'load-file) (lambda (file) (load file nil t)))
+                ((symbol-function 'message) (lambda (&rest _)))
+                ((symbol-function 'write-region)
+                 (lambda (start end filename &optional append visit lockname mustbenew)
+                   (unless visit (setq visit 'no-message))
+                   (doom--old-write-region-fn
+                    start end filename append visit lockname mustbenew)))
+                (inhibit-message t)
+                (save-silently t))
+        ,@forms)))
 #+END_SRC
 
 *** def-memoized!
@@ -3643,6 +3649,7 @@ for comment start/end characters."
   (advice-add #'recenter :around #'bmacs*blink-cursor-maybe)
 
   (after! evil
+    (advice-add #'evil--jumps-jump   :after #'bmacs/blink-cursor)
     (advice-add #'evil-window-top    :after #'bmacs/blink-cursor)
     (advice-add #'evil-window-middle :after #'bmacs/blink-cursor)
     (advice-add #'evil-window-bottom :after #'bmacs/blink-cursor)))
@@ -5229,10 +5236,6 @@ redefines its keys every time `eshell-mode' is enabled."
           [remap +workspace/close-window-or-workspace] #'eshell-life-is-too-much))
   (add-hook 'eshell-mode-hook #'+eshell|init-keymap)
 
-  (add-hook! eshell-mode
-    (add-hook 'evil-insert-state-exit-hook  #'hl-line-mode nil t)
-    (add-hook 'evil-insert-state-entry-hook (lambda () (hl-line-mode -1)) nil t))
-
   ;; Aliases
   (setq eshell-command-aliases-list
         '(("q"   "exit")
@@ -6476,7 +6479,6 @@ The best the JVM's got to offer
 
 (use-package ensime
   :after scala-mode
-  :commands (ensime ensime-mode ensime-scala-mode-hook)
   :config
   (add-hook 'scala-mode #'(lambda ()
                             (setq-local company-backends '(ensime-company company-yasnippet))))

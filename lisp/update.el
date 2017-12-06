@@ -46,6 +46,10 @@
 (unless (assoc-default "org" package-archives)
   (add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t))
 
+(setq package-pinned-packages
+      '((use-package . "melpa-stable")
+        (evil . "melpa-stable")))
+
 (quiet!
   (package-initialize)
   (package-refresh-contents))
