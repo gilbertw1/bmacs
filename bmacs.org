@@ -179,7 +179,7 @@
     - [[#update-faces][Update Faces]]
     - [[#mardown-open-comamnd][Mardown Open Comamnd]]
     - [[#fix-org-popups][Fix Org Popups]]
-  - [[#todos-02][Todos]]
+  - [[#todos-01][Todos]]
 
 ** About this file
 
@@ -897,7 +897,6 @@ Only display error level warnings immediately to the user
 
 #+BEGIN_SRC emacs-lisp
 (use-package async :demand t)
-(use-package s :demand t)
 (use-package f :demand t)
 (use-package subr-x :demand t :ensure nil)
 (require 'cl-lib)
@@ -1685,10 +1684,8 @@ Making everything all ivy-ed up.
   (ivy-set-display-transformer #'counsel-recentf #'abbreviate-file-name)
 
   ;; 1. Remove character limit from `counsel-ag-function'
-  ;; 2. Disable ivy's over-zealous parentheses quoting behavior (if i want
-  ;;    literal parentheses, I'll escape them myself).
-  ;; 3. This may need to be updated frequently, to meet changes upstream
-  ;; 4. counsel-ag, counsel-rg and counsel-pt all use this function
+  ;; 2. This may need to be updated frequently, to meet changes upstream
+  ;; 3. counsel-ag, counsel-rg and counsel-pt all use this function
   (defun +ivy*counsel-ag-function (string base-cmd extra-ag-args)
     "Advice to 1) get rid of the character limit from `counsel-ag-function' and 2)
   disable ivy's over-zealous parentheses quoting behavior (if i want literal
@@ -1702,9 +1699,7 @@ Making everything all ivy-ed up.
         (counsel-more-chars 1)
       (let ((default-directory counsel--git-dir)
             (regex (counsel-unquote-regex-parens
-                    (setq ivy--old-re
-                          (ivy--regex
-                           (counsel-unquote-regex-parens string)))))) ;; #2
+                    (setq ivy--old-re string)))) ;; #2
         (let* ((args-end (string-match " -- " extra-ag-args))
                (file (if args-end
                          (substring-no-properties extra-ag-args (+ args-end 3))
@@ -1969,11 +1964,11 @@ I like to move it move it
   (evil-embrace-enable-evil-surround-integration)
 
   (defun +evil--embrace-get-pair (char)
-    (if-let (pair (cdr-safe (assoc (string-to-char char) evil-surround-pairs-alist)))
+    (if-let* ((pair (cdr-safe (assoc (string-to-char char) evil-surround-pairs-alist))))
         pair
-      (if-let (pair (assoc-default char embrace--pairs-list))
-          (if-let (real-pair (and (functionp (embrace-pair-struct-read-function pair))
-                                  (funcall (embrace-pair-struct-read-function pair))))
+      (if-let* ((pair (assoc-default char embrace--pairs-list)))
+          (if-let* ((real-pair (and (functionp (embrace-pair-struct-read-function pair))
+                                    (funcall (embrace-pair-struct-read-function pair)))))
               real-pair
             (cons (embrace-pair-struct-left pair) (embrace-pair-struct-right pair)))
         (cons char char))))
@@ -2433,11 +2428,12 @@ repository root."
     (add-hook 'find-file-hook #'+git|enable-smerge-mode-maybe)
     :config
     (when (version< emacs-version "26")
-      (defalias #'smerge-keep-upper #'smerge-keep-mine)
-      (defalias #'smerge-keep-lower #'smerge-keep-other)
-      (defalias #'smerge-diff-base-upper #'smerge-diff-base-mine)
-      (defalias #'smerge-diff-upper-lower #'smerge-diff-mine-other)
-      (defalias #'smerge-diff-base-lower #'smerge-diff-base-other)))
+      (with-no-warnings
+        (defalias #'smerge-keep-upper #'smerge-keep-mine)
+        (defalias #'smerge-keep-lower #'smerge-keep-other)
+        (defalias #'smerge-diff-base-upper #'smerge-diff-base-mine)
+        (defalias #'smerge-diff-upper-lower #'smerge-diff-mine-other)
+        (defalias #'smerge-diff-base-lower #'smerge-diff-base-other))))
 
 #+END_SRC
 
@@ -2597,6 +2593,8 @@ A super cool dashboard on startup!
     "Major mode for the BMACS dashboard buffer."
     (read-only-mode +1)
     (setq truncate-lines t)
+    (setq-local whitespace-style nil)
+    (setq-local show-trailing-whitespace nil)
     (cl-loop for (car . _cdr) in fringe-indicator-alist
              collect (cons car nil) into alist
              finally do (setq fringe-indicator-alist alist)))
@@ -2874,7 +2872,7 @@ error if it doesn't exist."
 (defun doom-set-modeline (key &optional default)
   "Set the modeline format. Does nothing if the modeline KEY doesn't exist. If
 DEFAULT is non-nil, set the default mode-line for all buffers."
-  (when-let (modeline (doom-modeline key))
+  (when-let* ((modeline (doom-modeline key)))
     (setf (if default
               (default-value 'mode-line-format)
             (buffer-local-value 'mode-line-format (current-buffer)))
@@ -3198,7 +3196,6 @@ buffer where knowing the current project directory is important."
 (def-modeline-segment! buffer-info
   "Combined information about the current buffer, including the current working
 directory, the file name, and its state (modified, read-only or non-existent)."
-  (let ((all-the-icons-scale-factor 1.2))
     (concat (cond (buffer-read-only
                    (concat (all-the-icons-octicon
                             "lock"
@@ -3226,7 +3223,7 @@ directory, the file name, and its state (modified, read-only or non-existent)."
                            " ")))
             (if buffer-file-name
                 (+doom-modeline-buffer-file-name)
-              "%b"))))
+              "%b")))
 
 ;;
 (def-modeline-segment! buffer-info-simple
@@ -3270,7 +3267,6 @@ directory, the file name, and its state (modified, read-only or non-existent)."
            (state   (vc-state buffer-file-name backend)))
       (let ((face    'mode-line-inactive)
             (active  (active))
-            (all-the-icons-scale-factor 1.0)
             (all-the-icons-default-adjust -0.1))
         (concat "  "
                 (cond ((memq state '(edited added))
@@ -3278,7 +3274,6 @@ directory, the file name, and its state (modified, read-only or non-existent)."
                        (all-the-icons-octicon
                         "git-compare"
                         :face face
-                        :height 1.2
                         :v-adjust -0.05))
                       ((eq state 'needs-merge)
                        (if active (setq face 'doom-modeline-info))
@@ -3294,7 +3289,6 @@ directory, the file name, and its state (modified, read-only or non-existent)."
                        (all-the-icons-octicon
                         "git-compare"
                         :face face
-                        :height 1.2
                         :v-adjust -0.05)))
                 " "
                 (propertize (substring vc-mode (+ (if (eq backend 'Hg) 2 3) 2))
@@ -3719,6 +3713,21 @@ Highlights the current line
   (setq hl-line-sticky-flag nil
         global-hl-line-sticky-flag nil)
 
+  ;; On Emacs 26+, when point is on the last line, hl-line highlights bleed into
+  ;; the rest of the window after eob. This is the fix.
+  (when (boundp 'display-line-numbers)
+    (defun bmacs--line-range ()
+      (cons (line-beginning-position)
+            (cond ((save-excursion
+                     (goto-char (line-end-position))
+                     (and (eobp) (not (bolp))))
+                   (1- (line-end-position)))
+                  ((or (eobp) (save-excursion (forward-line) (eobp)))
+                   (line-end-position))
+                  (t
+                   (line-beginning-position 2)))))
+    (setq hl-line-range-function #'bmacs--line-range))
+
   ;; Disable `hl-line' in evil-visual mode (temporarily). `hl-line' can make
   ;; the selection region harder to see while in evil visual mode.
   (defun bmacs|disable-hl-line () (hl-line-mode -1))
@@ -4039,7 +4048,7 @@ It's org-mode ya'll
         ((org-at-heading-p)
          (ignore-errors (org-demote)))
         ((org-in-src-block-p t)
-         (doom/dumb-indent)) ; TODO dumb-indent
+         (indent-for-tab-command))
         (t
          (call-interactively #'self-insert-command))))
 
@@ -4213,15 +4222,15 @@ It's org-mode ya'll
   file exceeds this size some optimizations will be applied")
 
 (use-package toc-org
-  :commands toc-org-enable
-  :init (add-hook 'org-mode-hook #'toc-org-enable))
+             :commands toc-org-enable
+             :init (add-hook 'org-mode-hook #'toc-org-enable))
 
 ;; The standard unicode characters are usually misaligned depending on the font.
 ;; This bugs me. Personally, markdown #-marks for headlines are more elegant, so
 ;; we use those.
-  (use-package org-bullets
-    :commands org-bullets-mode
-    :init (add-hook 'org-mode-hook #'org-bullets-mode))
+(use-package org-bullets
+             :commands org-bullets-mode
+             :init (add-hook 'org-mode-hook #'org-bullets-mode))
 
 (defun +borg|hook ()
   "Run everytime `org-mode' is enabled."
@@ -4241,7 +4250,18 @@ It's org-mode ya'll
   (setq-local evil-auto-indent nil)
 
   ;; show-paren-mode causes problems for org-indent-mode, so disable it
-  (set (make-local-variable 'show-paren-mode) nil))
+  (set (make-local-variable 'show-paren-mode) nil)
+  (defun +org-sp-point-in-checkbox-p (_id action _context)
+    (when (eq action 'insert)
+      (sp--looking-at-p "\\s-*]")))
+
+  ;; make delimiter auto-closing a little more conservative
+  (sp-with-modes 'org-mode
+    (sp-local-pair "*" nil :unless '(sp-point-after-word-p sp-point-before-word-p sp-point-at-bol-p))
+    (sp-local-pair "_" nil :unless '(sp-point-after-word-p sp-point-before-word-p))
+    (sp-local-pair "/" nil :unless '(sp-point-after-word-p sp-point-before-word-p +org-sp-point-in-checkbox-p))
+    (sp-local-pair "~" nil :unless '(sp-point-after-word-p sp-point-before-word-p))
+    (sp-local-pair "=" nil :unless '(sp-point-after-word-p sp-point-before-word-p))))
 
 (defun +borg|init ()
   "Run once, when org is first loaded."
@@ -4269,9 +4289,9 @@ It's org-mode ya'll
    org-cycle-separator-lines 1
    org-entities-user '(("flat"  "\\flat" nil "" "" "266D" "♭") ("sharp" "\\sharp" nil "" "" "266F" "♯"))
    org-ellipsis "  "
-   ;org-fontify-done-headline t
+                                        ;org-fontify-done-headline t
    org-fontify-quote-and-verse-blocks t
-   ;org-fontify-whole-heading-line t
+                                        ;org-fontify-whole-heading-line t
    org-footnote-auto-label 'plain
    org-hidden-keywords nil
    org-hide-emphasis-markers nil
@@ -4295,8 +4315,8 @@ It's org-mode ya'll
    org-log-done 'time)
 
   ;; Use ivy/helm if either is available
-    (setq-default org-completion-use-ido nil
-                  org-outline-path-complete-in-steps nil))
+  (setq-default org-completion-use-ido nil
+                org-outline-path-complete-in-steps nil))
 
 (defun evil-org-eol-call (fun)
   "Go to end of line and call provided function.
@@ -4366,29 +4386,29 @@ between the two."
                             (org-metaright))))
 
           (:localleader
-           :n  "RET" #'org-archive-subtree
-           :n  "SPC" #'+borg/toggle-checkbox
-           :n  "/"   #'org-sparse-tree
-           :n  "="   #'org-align-all-tags
-           :n  "?"   #'org-tags-view
-           :n  "a"   #'org-agenda
-           :n  "d"   #'org-time-stamp
-           :n  "D"   #'org-deadline
-           :n  "e"   #'org-edit-special
-           :n  "E"   #'+borg/edit-special-same-window
-           :n  "i"   (lambda () (if (and (boundp 'iimage-mode) iimage-mode) (iimage-mode -1) (iimage-mode +1)))
-           :n  "n"   (lambda () (if (buffer-narrowed-p) (widen) (org-narrow-to-subtree)))
-           :n  "r"   #'org-refile
-           :n  "R"   (lambda () (org-metaleft) (org-archive-to-archive-sibling)) ; archive to parent sibling
-           :n  "s"   #'org-schedule
-           :n  "t"   #'counsel-org-tag
-           :v  "t"   (lambda () (evil-ex-normal evil-visual-beginning evil-visual-end "\\t"))
-           :n  "T"   #'org-todo
-           :n  "v"   #'variable-pitch-mode
-           :nv "l"   #'org-insert-link
-           :nv "L"   #'org-store-link
-           :n  "+"   #'org-timestamp-up-day
-           :n  "-"   #'org-timestamp-down-day)
+            :n  "RET" #'org-archive-subtree
+            :n  "SPC" #'+borg/toggle-checkbox
+            :n  "/"   #'org-sparse-tree
+            :n  "="   #'org-align-all-tags
+            :n  "?"   #'org-tags-view
+            :n  "a"   #'org-agenda
+            :n  "d"   #'org-time-stamp
+            :n  "D"   #'org-deadline
+            :n  "e"   #'org-edit-special
+            :n  "E"   #'+borg/edit-special-same-window
+            :n  "i"   (lambda () (if (and (boundp 'iimage-mode) iimage-mode) (iimage-mode -1) (iimage-mode +1)))
+            :n  "n"   (lambda () (if (buffer-narrowed-p) (widen) (org-narrow-to-subtree)))
+            :n  "r"   #'org-refile
+            :n  "R"   (lambda () (org-metaleft) (org-archive-to-archive-sibling)) ; archive to parent sibling
+            :n  "s"   #'org-schedule
+            :n  "t"   #'counsel-org-tag
+            :v  "t"   (lambda () (evil-ex-normal evil-visual-beginning evil-visual-end "\\t"))
+            :n  "T"   #'org-todo
+            :n  "v"   #'variable-pitch-mode
+            :nv "l"   #'org-insert-link
+            :nv "L"   #'org-store-link
+            :n  "+"   #'org-timestamp-up-day
+            :n  "-"   #'org-timestamp-down-day)
 
           :n  "<"   #'org-metaleft
           :n  ">"   #'org-metaright
@@ -5283,7 +5303,7 @@ TODO - I really have no idea
 (defun +neotree/collapse-or-up ()
   "Collapse an expanded directory node or go to the parent node."
   (interactive)
-  (when-let (node (neo-buffer--get-filename-current-line))
+  (when-let* ((node (neo-buffer--get-filename-current-line)))
     (if (file-directory-p node)
         (if (neo-buffer--expanded-node-p node)
             (+neotree/collapse)
@@ -5293,7 +5313,7 @@ TODO - I really have no idea
 (defun +neotree/collapse ()
   "Collapse a neotree node."
   (interactive)
-  (when-let (node (neo-buffer--get-filename-current-line))
+  (when-let* ((node (neo-buffer--get-filename-current-line)))
     (when (file-directory-p node)
       (neo-buffer--set-expand node nil)
       (neo-buffer--refresh t))
@@ -5320,7 +5340,7 @@ TODO - I really have no idea
 (defun +neotree/expand-or-open ()
   "Expand or open a neotree node."
   (interactive)
-  (when-let (node (neo-buffer--get-filename-current-line))
+  (when-let* ((node (neo-buffer--get-filename-current-line)))
     (cond ((file-directory-p node)
            (neo-buffer--set-expand node t)
            (neo-buffer--refresh t)
@@ -5462,9 +5482,9 @@ Can you hear the C? -- TODO: Pair this down to just basic C/C++ support ... too 
            (or (file-exists-p (expand-file-name
                                (concat (file-name-sans-extension buffer-file-name)
                                        ".cpp")))
-               (when-let (file (car-safe (projectile-get-other-files
-                                          buffer-file-name
-                                          (projectile-current-project-files))))
+               (when-let* ((file (car-safe (projectile-get-other-files
+                                           buffer-file-name
+                                           (projectile-current-project-files)))))
                  (equal (file-name-extension file) "cpp")))))
 
     (defun +cc-objc-header-file-p ()
@@ -5930,6 +5950,7 @@ Python? Lisp? WTF?
 *** Java / Android / Groovy
 
 #+BEGIN_SRC emacs-lisp
+  (add-hook 'java-mode-hook #'rainbow-delimiters-mode)
 
   (use-package meghanada
     :commands meghanada-mode
@@ -5943,10 +5964,7 @@ Python? Lisp? WTF?
           meghanada-use-auto-start nil)
 
     ;; Setup on first use
-    (meghanada-install-server)
-    (if (file-exists-p (meghanada--locate-server-jar))
-        (add-hook! 'meghanada-mode-hook #'(flycheck-mode eldoc-mode))
-      (warn "java-mode: meghanada-server not installed, java-mode will run with reduced functionality")))
+  (add-hook! 'meghanada-mode-hook #'(flycheck-mode eldoc-mode)))
 
   (use-package android-mode
     :commands android-mode
@@ -6330,7 +6348,7 @@ is loaded.")
     (defun +python|detect-pyenv-version ()
       "Detect the pyenv version for the current project and set the relevant
 environment variables."
-      (when-let (version-str (shell-command-to-string "python --version 2>&1 | cut -d' ' -f2"))
+      (when-let* ((version-str (shell-command-to-string "python --version 2>&1 | cut -d' ' -f2")))
         (setq version-str (string-trim version-str)
               +python-current-version version-str)
         (let ((pyenv-current-path (concat +python-pyenv-root "/versions/" version-str)))
@@ -6400,7 +6418,7 @@ environment variables."
     (defun +ruby|detect-rbenv-version ()
       "Detect the rbenv version for the current project and set the relevant
 environment variables."
-      (when-let (version-str (shell-command-to-string "ruby --version 2>&1 | cut -d' ' -f2"))
+      (when-let* ((version-str (shell-command-to-string "ruby --version 2>&1 | cut -d' ' -f2")))
         (setq version-str (string-trim version-str)
               +ruby-current-version version-str)
         (when (member version-str +ruby-rbenv-versions)
@@ -6714,8 +6732,9 @@ Get Scwhifty!
 (add-hook 'css-mode-hook #'(yas-minor-mode-on flycheck-mode highlight-numbers-mode))
 (add-hook 'sass-mode-hook #'(yas-minor-mode-on flycheck-mode highlight-numbers-mode))
 
-(sp-with-modes '(css-mode scss-mode less-css-mode stylus-mode)
-  (sp-local-pair "/*" "*/" :post-handlers '(("[d-3]||\n[i]" "RET") ("| " "SPC"))))
+(after! smartparens
+  (sp-with-modes '(css-mode scss-mode less-css-mode stylus-mode)
+    (sp-local-pair "/*" "*/" :post-handlers '(("[d-3]||\n[i]" "RET") ("| " "SPC")))))
 
 (map! :map* (css-mode-map scss-mode-map less-css-mode-map)
       :n "M-R" #'+css/web-refresh-browser
@@ -8073,11 +8092,7 @@ Set the various indentations
     (apply #'switch-to-buffer-other-window args)))
 #+END_SRC
 
-** Todos [0/2]
+** Todos [0/1]
 
 - [ ] Fix evil-mc incorrect cursor position
       When using 'C-S-j' sometimes the cursor jumps around
-
-- [ ] Implement 'surround-type' like surround function for generic types
-Uses correct syntax for known languages (maybe only implemented for those langs)
-eg. Highlight 'User' -> Press 'st' -> Type 'Seq' -> Result: Seq[User]
