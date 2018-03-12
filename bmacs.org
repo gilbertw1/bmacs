@@ -78,7 +78,7 @@
     - [[#git-link][git-link]]
     - [[#evil-magit][evil-magit]]
     - [[#smerge][smerge]]
-    - [[#magithub][magithub]]
+    - [[#magithub-disabled][magithub (disabled)]]
   - [[#ui-1][UI]]
     - [[#all-the-icons][all-the-icons]]
     - [[#vi-tilde-fringe][vi-tilde-fringe]]
@@ -248,7 +248,6 @@ different types of files.
 
   (defvar bmacs-packages-dir (concat bmacs-local-dir "packages/")
     "Where package.el and quelpa plugins (and their caches) are stored.")
-
 
   (dolist (dir (list bmacs-local-dir bmacs-etc-dir bmacs-cache-dir (expand-file-name "elpa" bmacs-packages-dir)))
     (unless (file-directory-p dir)
@@ -1056,7 +1055,7 @@ Enable line numbers
 
 
 ;; revert buffers for changed files
-(global-auto-revert-mode 1)
+(global-auto-revert-mode -1)
 (setq auto-revert-verbose nil)
 
 (show-paren-mode)
@@ -1289,8 +1288,7 @@ They power and the glory! Generic complete anything frontend
   (after! magit     (setq magit-completing-read-function #'ivy-completing-read))
   (after! yasnippet (push #'+ivy-yas-prompt yas-prompt-functions))
 
-  (map! :map ivy-mode-map
-        [remap apropos]                   #'counsel-apropos
+  (map! [remap apropos]                   #'counsel-apropos
         [remap describe-face]             #'counsel-describe-face
         [remap find-file]                 #'counsel-find-file
         [remap switch-to-buffer]          #'ivy-switch-buffer
@@ -1681,42 +1679,7 @@ Making everything all ivy-ed up.
 
 
   (ivy-set-display-transformer #'counsel-projectile-switch-to-buffer #'+ivy-buffer-transformer)
-  (ivy-set-display-transformer #'counsel-recentf #'abbreviate-file-name)
-
-  ;; 1. Remove character limit from `counsel-ag-function'
-  ;; 2. This may need to be updated frequently, to meet changes upstream
-  ;; 3. counsel-ag, counsel-rg and counsel-pt all use this function
-  (defun +ivy*counsel-ag-function (string base-cmd extra-ag-args)
-    "Advice to 1) get rid of the character limit from `counsel-ag-function' and 2)
-  disable ivy's over-zealous parentheses quoting behavior (if i want literal
-  parentheses, I'll escape them myself).
-
-  NOTE This may need to be updated frequently, to meet changes upstream (in
-  counsel-rg)."
-    (when (null extra-ag-args)
-      (setq extra-ag-args ""))
-    (if (< (length string) 1)  ;; #1
-        (counsel-more-chars 1)
-      (let ((default-directory counsel--git-dir)
-            (regex (counsel-unquote-regex-parens
-                    (setq ivy--old-re string)))) ;; #2
-        (let* ((args-end (string-match " -- " extra-ag-args))
-               (file (if args-end
-                         (substring-no-properties extra-ag-args (+ args-end 3))
-                       ""))
-               (extra-ag-args (if args-end
-                                  (substring-no-properties extra-ag-args 0 args-end)
-                                extra-ag-args))
-               (ag-cmd (format base-cmd
-                               (concat extra-ag-args
-                                       " -- "
-                                       (shell-quote-argument regex)
-                                       file))))
-          (if (file-remote-p default-directory)
-              (split-string (shell-command-to-string ag-cmd) "\n" t)
-            (counsel--async-command ag-cmd)
-            nil)))))
-  (advice-add #'counsel-ag-function :override #'+ivy*counsel-ag-function))
+  (ivy-set-display-transformer #'counsel-recentf #'abbreviate-file-name))
 #+END_SRC
 
 *** smex
@@ -2017,7 +1980,7 @@ I like to move it move it
 #+END_SRC
 
 **** evil-escape
-Escape everything
+Escape everything TODO
 
 #+BEGIN_SRC emacs-lisp
 (use-package evil-escape
@@ -2437,9 +2400,9 @@ repository root."
 
 #+END_SRC
 
-*** magithub
+*** magithub (disabled)
 
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC emacs-lisp :tangle no
 (use-package magithub
   :ensure t
   :after magit
@@ -2463,17 +2426,15 @@ Allows us to show pretty icons in Emacs.
              all-the-icons-wicon all-the-icons-material all-the-icons-alltheicon
              all-the-icons-install-fonts)
   :init
-  (defun disable-all-the-icons-in-tty (orig-fn &rest args)
+  (defun bmacs*disable-all-the-icons-in-tty (orig-fn &rest args)
     (when (display-graphic-p)
       (apply orig-fn args)))
 
   ;; all-the-icons doesn't work in the terminal, so we "disable" it.
-  (advice-add #'all-the-icons-octicon    :around #'disable-all-the-icons-in-tty)
-  (advice-add #'all-the-icons-material   :around #'disable-all-the-icons-in-tty)
-  (advice-add #'all-the-icons-faicon     :around #'disable-all-the-icons-in-tty)
-  (advice-add #'all-the-icons-fileicon   :around #'disable-all-the-icons-in-tty)
-  (advice-add #'all-the-icons-wicon      :around #'disable-all-the-icons-in-tty)
-  (advice-add #'all-the-icons-alltheicon :around #'disable-all-the-icons-in-tty))
+  (dolist (fn '(all-the-icons-octicon all-the-icons-material
+                 all-the-icons-faicon all-the-icons-fileicon
+                 all-the-icons-wicon all-the-icons-alltheicon))
+     (advice-add fn :around #'bmacs*disable-all-the-icons-in-tty)))
 #+END_SRC
 
 *** vi-tilde-fringe
@@ -3753,8 +3714,12 @@ Allows margins to be dynamically resized.
 (use-package visual-fill-column
   :commands visual-fill-column-mode
   :config
-  (setq-default visual-fill-column-center-text nil
-                visual-fill-column-width fill-column))
+  (setq-default
+    visual-fill-column-center-text t
+    visual-fill-column-width
+    ;; take Emacs 26 line numbers into account
+    (+ (if (boundp 'display-line-numbers) 6 0)
+       fill-column)))
 #+END_SRC
 
 *** nlinum-mode
@@ -5080,7 +5045,7 @@ Directories in Emacs
       dired-recursive-copies  'always
       dired-recursive-deletes 'top
       ;; Auto refresh dired, but be quiet about it
-      global-auto-revert-non-file-buffers t
+      global-auto-revert-non-file-buffers nil
       auto-revert-verbose nil
       ;; files
       image-dired-dir (concat bmacs-cache-dir "image-dired/")
@@ -6844,6 +6809,8 @@ Now we're going to create a set of rules based on the buffers we would like to b
 (bmacs/make-popup (rx bos "*Flycheck errors*" eos))
 ;; VC Diff
 (bmacs/make-popup (rx bos "*vc-diff*" eos))
+;; Profiler Report
+(bmacs/make-popup (rx bos "*CPU-Profiler-Report"))
 ;; Org Popups
 (bmacs/make-popup (rx bos "*Calendar*" eos))
 (bmacs/make-popup (rx bos "*Org todo*" eos) 0.05)
@@ -7450,6 +7417,8 @@ session)."
  "M-0"    (λ! (text-scale-set 0))
  "M-="    #'text-scale-increase
  "M--"    #'text-scale-decrease
+ ;; Evil Escape
+ [escape] #'evil-escape
  ;; Temporary escape into emacs mode
  :e [C-escape] #'evil-normal-state
  :n [C-escape] #'evil-emacs-state
@@ -7470,7 +7439,7 @@ session)."
     :desc "Search in project"                :nv "/" #'counsel-projectile-rg
     :desc "Search from here"                 :nv "?" #'counsel-rg
     :desc "Find selection in project"        :nv "*" #'counsel-projectile-rg-region-or-symbol
-    :desc "Switch to Emacs mode"             :n "|" #'evil-emacs-state
+    :desc "Switch to Emacs mode"             :n "|"  #'evil-emacs-state
     :desc "Switch to last buffer"            :nv "TAB" #'bmacs/alternate-buffer
     :desc "Ace window"                       :nv "W" #'ace-window
     :desc "Pop terminal"                     :nv "'" #'+term/open-popup
@@ -7699,9 +7668,11 @@ session)."
 
  ;; help-mode
  (:map help-mode-map
-   :n "]]"  #'help-go-forward
-   :n "[["  #'help-go-back
-   :n "o"   #'ace-link-help)
+   :n "q"      #'quit-window
+   :n [escape] #'quit-window
+   :n "]]"     #'help-go-forward
+   :n "[["     #'help-go-back
+   :n "o"      #'ace-link-help)
 
  ;; --- Plugin bindings ------------------------------
  ;; auto-yasnippet
@@ -8010,11 +7981,11 @@ Open url links in qutebrowser
 #+BEGIN_SRC emacs-lisp
 (defun gilbertw1/browse-url (url &optional ignored)
   (interactive (browse-url-interactive-arg "URL: "))
-  (call-process "/home/gilbertw1/bin/open-qutebrowser" nil 0 nil url))
+  (call-process "firefox" nil 0 nil url))
 (setq browse-url-browser-function #'gilbertw1/browse-url)
 
 (defun gilbertw1/browse-url-new-window (url &optional ignored)
-  (call-process "qutebrowser" nil 0 nil "--target" "window" url))
+  (call-process "firefox" nil 0 nil "-new-window" url))
 (setq counsel-dash-browser-func #'gilbertw1/browse-url-new-window)
 #+END_SRC
 
