@@ -2458,7 +2458,8 @@ Vi like tilde's in the fringe for past EOF
   :demand t
   :config
   ;(set! :theme 'doom-one)
-  (load-theme 'doom-one t)
+  (load-file (expand-file-name "~/.emacs.d/doom-nord-custom-theme.el"))
+  (load-theme 'doom-nord-custom t)
 
   ;; improve integration with org-mode
   (add-hook 'bmacs-post-init-hook #'doom-themes-org-config)
@@ -3665,9 +3666,7 @@ Highlights the current line
 (use-package hl-line ; built-in
   :demand t
   :init
-  (add-hook 'prog-mode #'hl-line-mode)
-  (add-hook 'text-mode #'hl-line-mode)
-  (add-hook 'conf-mode #'hl-line-mode)
+  (add-hook! '(prog-mode-hook text-mode-hook conf-mode-hook) #'hl-line-mode)
   :config
   ;; I don't need hl-line showing in other windows. This also offers a small
   ;; speed boost when buffer is displayed in multiple windows.
@@ -5932,12 +5931,7 @@ Python? Lisp? WTF?
   (add-hook! 'meghanada-mode-hook #'(flycheck-mode eldoc-mode)))
 
   (use-package android-mode
-    :commands android-mode
-    :init
-    (add-hook! (java-mode groovy-mode nxml-mode) #'+java|android-mode-maybe))
-    ;; :config
-    ;; (set! :yas-minor-mode 'android-mode)
-    ;; (set! :company-dict-minor-mode 'android-mode))
+    :commands android-mode)
 
   (use-package groovy-mode
     :mode "\\.g\\(radle\\|roovy\\)$")
@@ -6694,8 +6688,7 @@ Get Scwhifty!
 
 #+BEGIN_SRC emacs-lisp
 (add-hook 'css-mode-hook #'rainbow-delimiters-mode)
-(add-hook 'css-mode-hook #'(yas-minor-mode-on flycheck-mode highlight-numbers-mode))
-(add-hook 'sass-mode-hook #'(yas-minor-mode-on flycheck-mode highlight-numbers-mode))
+(add-hook! (css-mode-hook) #'(yas-minor-mode-on flycheck-mode highlight-numbers-mode))
 
 (after! smartparens
   (sp-with-modes '(css-mode scss-mode less-css-mode stylus-mode)
@@ -6719,13 +6712,10 @@ Get Scwhifty!
   (add-hook 'css-mode-hook #'(lambda ()
                                (setq-local company-backends '(company-css company-yasnippet))))
   (add-hook 'sass-mode-hook #'(lambda ()
-                               (setq-local company-backends '(company-css company-yasnippet))))
-  (map! :map scss-mode-map :localleader "b" #'+css/scss-build))
+                               (setq-local company-backends '(company-css company-yasnippet)))))
 
 (use-package sass-mode
-  :mode "\\.sass$"
-  :config
-  (map! :map scss-mode-map :localleader "b" #'+css/sass-build))
+  :mode "\\.sass$")
 
 (use-package less-css-mode
   :mode "\\.less$")
@@ -6809,6 +6799,10 @@ Now we're going to create a set of rules based on the buffers we would like to b
 (bmacs/make-popup (rx bos "*Flycheck errors*" eos))
 ;; VC Diff
 (bmacs/make-popup (rx bos "*vc-diff*" eos))
+;; Sbt
+(bmacs/make-popup (rx bos "*sbt*"))
+;; GHC Error
+(bmacs/make-popup (rx bos "*GHC Error*"))
 ;; Profiler Report
 (bmacs/make-popup (rx bos "*CPU-Profiler-Report"))
 ;; Org Popups
@@ -7119,7 +7113,7 @@ _SPC_ cancel	_o_nly this   	_d_elete			_=_ Balance
             (message file-name))
         (error "Buffer not visiting a file"))))
 
-  (defun bmacs/alternate-buffer (&optional window)
+  (defun bmacs/alternate-buffer-old (&optional window)
     "Switch back and forth between current and last buffer in the
   current window."
     (interactive)
@@ -7136,6 +7130,14 @@ _SPC_ cancel	_o_nly this   	_d_elete			_=_ Balance
                        (mapcar #'car (window-prev-buffers window)))
            ;; `other-buffer' honors `buffer-predicate' so no need to filter
            (other-buffer current-buffer t)))))
+
+(defun bmacs/alternate-buffer ()
+  "Switch back and forth between current and last buffer in the
+current perspective."
+  (interactive)
+  (with-persp-buffer-list ()
+                          (switch-to-buffer (other-buffer (current-buffer) t))))
+
 
   (defun bmacs/toggle-fold ()
     (interactive)
@@ -7981,11 +7983,11 @@ Open url links in qutebrowser
 #+BEGIN_SRC emacs-lisp
 (defun gilbertw1/browse-url (url &optional ignored)
   (interactive (browse-url-interactive-arg "URL: "))
-  (call-process "firefox" nil 0 nil url))
+  (call-process "firefox-developer-edition" nil 0 nil url))
 (setq browse-url-browser-function #'gilbertw1/browse-url)
 
 (defun gilbertw1/browse-url-new-window (url &optional ignored)
-  (call-process "firefox" nil 0 nil "-new-window" url))
+  (call-process "firefox-developer-edition" nil 0 nil "-new-window" url))
 (setq counsel-dash-browser-func #'gilbertw1/browse-url-new-window)
 #+END_SRC
 
@@ -8020,10 +8022,10 @@ Set the various indentations
 #+BEGIN_SRC emacs-lisp
 ;; Override vc modified color (gray -> yellow)
 (custom-set-faces
-  '(diff-hl-change         ((t (:foreground "#ECBE7B"))))
-  '(git-gutter:modified    ((t (:foreground "#ECBE7B"))))
-  '(git-gutter+-modified   ((t (:foreground "#ECBE7B"))))
-  '(git-gutter-fr:modified ((t (:foreground "#ECBE7B")))))
+  '(diff-hl-change         ((t (:foreground "#ECCC87"))))
+  '(git-gutter:modified    ((t (:foreground "#ECCC87"))))
+  '(git-gutter+-modified   ((t (:foreground "#ECCC87"))))
+  '(git-gutter-fr:modified ((t (:foreground "#ECCC87")))))
 
 ;; Override smerge colors
 (custom-set-faces
@@ -8032,20 +8034,20 @@ Set the various indentations
 
 ;; Override evil googles colors
 (custom-set-faces
- '(evil-goggles-delete-face           ((t (:foreground "#ff6c6b"))))
- '(evil-goggles-paste-face            ((t (:foreground "#98be65"))))
- '(evil-goggles-yank-face             ((t (:foreground "#51afef"))))
- '(evil-goggles-undo-redo-remove-face ((t (:foreground "#ff6c6b"))))
- '(evil-goggles-undo-redo-add-face    ((t (:foreground "#98be65"))))
- '(evil-goggles-undo-redo-change-face ((t (:foreground "#51afef")))))
+ '(evil-goggles-delete-face           ((t (:foreground "#ff6655"))))
+ '(evil-goggles-paste-face            ((t (:foreground "#99bb66"))))
+ '(evil-goggles-yank-face             ((t (:foreground "#5E81AC"))))
+ '(evil-goggles-undo-redo-remove-face ((t (:foreground "#ff6655"))))
+ '(evil-goggles-undo-redo-add-face    ((t (:foreground "#99bb66"))))
+ '(evil-goggles-undo-redo-change-face ((t (:foreground "#5E81AC")))))
 
 ;; Override org mode colors
 (custom-set-faces
- '(org-level-1              ((t :foreground "#51afef" :inherit nil :height 1.2)))
- '(org-level-2              ((t :foreground "#DCAEEA" :inherit nil :height 1.1)))
- '(org-level-3              ((t :foreground "#a9a1e1" :inherit nil :height 1.1)))
- '(org-level-4              ((t :foreground "#ECBE7B" :inherit nil :height 1.1)))
- '(org-level-5              ((t :foreground "#46D9FF" :inherit nil :height 1.1))))
+ '(org-level-1              ((t :foreground "#80A0C2" :inherit nil :height 1.2)))
+ '(org-level-2              ((t :foreground "#B58DAE" :inherit nil :height 1.1)))
+ '(org-level-3              ((t :foreground "#8EBCBB" :inherit nil :height 1.1)))
+ '(org-level-4              ((t :foreground "#ECCC87" :inherit nil :height 1.1)))
+ '(org-level-5              ((t :foreground "#D2876D" :inherit nil :height 1.1))))
 #+END_SRC
 
 *** Mardown Open Comamnd
