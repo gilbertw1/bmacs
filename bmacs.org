@@ -22,7 +22,6 @@
   - [[#emacs-initialization][Emacs Initialization]]
     - [[#initialization-settings][Initialization Settings]]
     - [[#initialize-and-add-package-sources][Initialize and Add Package Sources]]
-    - [[#setup-quelpa][Setup Quelpa]]
   - [[#doom-macros][DOOM! Macros]]
     - [[#after][after!]]
     - [[#map][map!]]
@@ -31,15 +30,17 @@
     - [[#def-memoized][def-memoized!]]
     - [[#λ][λ!]]
   - [[#core-settings][Core Settings]]
-    - [[#core][Core]]
+    - [[#charset][Charset]]
     - [[#libraries][Libraries]]
     - [[#backups][Backups]]
     - [[#history][History]]
-    - [[#cool-doom-exit-messages][Cool doom exit messages]]
     - [[#ui][UI]]
     - [[#editor][Editor]]
     - [[#font-1][Font]]
     - [[#help][Help]]
+    - [[#cool-doom-exit-messages][Cool doom exit messages]]
+    - [[#various-settings][Various Settings]]
+    - [[#file-locations][File Locations]]
     - [[#operating-system-specific][Operating System Specific]]
   - [[#core-packages][Core Packages]]
     - [[#which-key][which-key]]
@@ -407,31 +408,6 @@ Add the package directory =mu4e= to the load path.
 #+BEGIN_SRC emacs-lisp
   (eval-and-compile
     (add-to-list 'load-path "/usr/share/emacs/site-lisp/mu4e"))
-#+END_SRC
-
-*** Setup Quelpa
-
-Not currently using quelpa, so not enabled.
-
-#+BEGIN_SRC emacs-lisp :tangle no
-
-  (setq quelpa-checkout-melpa-p nil
-        quelpa-update-melpa-p nil
-        quelpa-melpa-recipe-stores nil
-        quelpa-self-upgrade-p nil
-        quelpa-dir (expand-file-name "quelpa" bmacs-packages-dir)
-        quelpa-update-melpa-p nil)
-
-  (eval-when-compile
-    (unless (require 'quelpa nil t)
-      (with-temp-buffer
-        (url-insert-file-contents "http://raw.github.com/quelpa/quelpa/master/bootstrap.el")
-        (eval-buffer))
-      (quelpa
-     '(quelpa-use-package
-       :fetcher github
-       :repo "quelpa/quelpa-use-package")))
-    (require 'quelpa-use-package))
 #+END_SRC
 
 ** DOOM! Macros
@@ -839,9 +815,7 @@ have the same meaning as in `defun'."
 
 ** Core Settings
 
-*** Core
-
-**** Charset
+*** Charset
 
 Set UTF-8 as the default coding system
 
@@ -854,42 +828,6 @@ Set UTF-8 as the default coding system
 (set-selection-coding-system 'utf-8)
 (setq locale-coding-system   'utf-8)
 (setq-default buffer-file-coding-system 'utf-8)
-
-#+END_SRC
-
-**** Random Doom! Configurations
-
-TODO - Sort these out better
-
-#+BEGIN_SRC emacs-lisp
-(setq-default
- ad-redefinition-action 'accept   ; silence advised function warnings
- apropos-do-all t                 ; make `apropos' more useful
- compilation-always-kill t        ; kill compilation process before starting another
- compilation-ask-about-save nil   ; save all buffers on `compile'
- compilation-scroll-output t
- confirm-nonexistent-file-or-buffer t
- enable-recursive-minibuffers nil
- idle-update-delay 2              ; update ui less often
- ;; keep the point out of the minibuffer
- minibuffer-prompt-properties '(read-only t point-entered minibuffer-avoid-prompt face minibuffer-prompt)
- ;; History & backup settings (save nothing, that's what git is for)
- ;; files
- abbrev-file-name             (concat bmacs-local-dir "abbrev.el")
- auto-save-list-file-name     (concat bmacs-cache-dir "autosave"))
-#+END_SRC
-
-**** Pcache File Location
-
-#+BEGIN_SRC emacs-lisp
-(setq pcache-directory (concat bmacs-cache-dir "pcache"))
-#+END_SRC
-
-**** Warnings
-Only display error level warnings immediately to the user
-
-#+BEGIN_SRC emacs-lisp
-(setq warning-minimum-level :error)
 #+END_SRC
 
 *** Libraries
@@ -899,7 +837,6 @@ Only display error level warnings immediately to the user
 (use-package f :demand t)
 (use-package subr-x :demand t :ensure nil)
 (require 'cl-lib)
-
 #+END_SRC
 
 *** Backups
@@ -914,7 +851,9 @@ We don't make any backups of files. This is what git is for.
 
 *** History
 
+Various history preservation settings settings
 From http://www.wisdomandwonder.com/wp-content/uploads/2014/03/C3F.html:
+
 #+BEGIN_SRC emacs-lisp
 (setq savehist-file (concat bmacs-cache-dir "savehist")
       history-length 500
@@ -929,69 +868,61 @@ From http://www.wisdomandwonder.com/wp-content/uploads/2014/03/C3F.html:
 
 **** TODO Verify all the save/history settings
 
-*** Cool doom exit messages
-
-#+BEGIN_SRC emacs-lisp
-(defun doom-quit-p (&optional prompt)
-  "Return t if this session should be killed. Prompts the user for
-confirmation."
-(or (yes-or-no-p (format "››› %s" (or prompt "Quit Emacs?")))
-    (ignore (message "Aborted"))))
-(setq confirm-kill-emacs nil)
-(add-hook 'kill-emacs-query-functions #'doom-quit-p)
-#+END_SRC
-
 *** UI
 
-#+BEGIN_SRC emacs-lisp
+**** Various Settings
 
-(tooltip-mode -1) ; relegate tooltips to echo area only
+#+BEGIN_SRC emacs-lisp
+(setq-default
+  bidi-display-reordering nil         ; disable bidirectional text for tiny performance boost
+  blink-matching-paren nil            ; don't blink--too distracting
+  cursor-in-non-selected-windows nil  ; hide cursors in other windows
+  display-line-numbers-width 3        ; minimum width used to display line numbers
+  frame-inhibit-implied-resize t      ; prevent frames from automatically resizing themselves
+  ;; remove continuation arrow on right fringe
+  highlight-nonselected-windows nil   ; don't highlight selections in other windows
+  fringe-indicator-alist (delq (assq 'continuation fringe-indicator-alist) fringe-indicator-alist)
+  indicate-buffer-boundaries nil      ; don't indicate beginning and end of buffer in fringe
+  indicate-empty-lines nil            ; don't indicate empty lines in fringe
+  max-mini-window-height 0.3          ; maximum height for resizing mini windows
+  mode-line-default-help-echo nil     ; disable mode-line mouseovers
+  mouse-yank-at-point t               ; middle-click paste at point, not at click
+  resize-mini-windows 'grow-only      ; Minibuffer resizing
+  show-help-function nil              ; hide :help-echo text
+  split-width-threshold 160           ; favor horizontal splits
+  uniquify-buffer-name-style 'forward ; follow unix path style when creating unique buffer names
+  use-dialog-box nil                  ; always avoid GUI
+  visible-cursor nil                  ; don't make cursor 'very visible'
+  x-stretch-cursor nil                ; don't add wide glyph under cursor
+
+  jit-lock-defer-time nil             ; defer jit font locking slightly to [try to] improve Emacs performance
+  ;; BMACS - improve cpu usage vs DOOM
+  jit-lock-stealth-nice 0.5           ; pause time between fontify chunks
+  jit-lock-stealth-time 1             ; time to wait before start of stealth fontify
+  jit-lock-stealth-verbose nil        ; silence stealth fontification
+  ;; `pos-tip' defaults
+  pos-tip-internal-border-width 6     ; increase pos-tip width
+  pos-tip-border-width 1              ; define border width
+  ;; no beeping or blinking please
+  ring-bell-function #'ignore         ; don't beep
+  visible-bell nil)                   ; don't blink
+
+  (fset #'yes-or-no-p #'y-or-n-p)     ; y/n instead of yes/no
+#+END_SRC
+
+**** Toolbar
+
+Disable tooltips, menubar, and scroll bar.
+
+#+BEGIN_SRC emacs-lisp
+(tooltip-mode -1)
 (menu-bar-mode -1)
 (if (fboundp 'tool-bar-mode)   (tool-bar-mode -1))
 (if (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
-
-(setq-default
-  bidi-display-reordering nil ; disable bidirectional text for tiny performance boost
-  blink-matching-paren nil    ; don't blink--too distracting
-  cursor-in-non-selected-windows nil  ; hide cursors in other windows
-  display-line-numbers-width 3
-  frame-inhibit-implied-resize t
-  ;; remove continuation arrow on right fringe
-  fringe-indicator-alist (delq (assq 'continuation fringe-indicator-alist)
-                               fringe-indicator-alist)
-  highlight-nonselected-windows nil
-  image-animate-loop t
-  indicate-buffer-boundaries nil
-  indicate-empty-lines nil
-  max-mini-window-height 0.3
-  mode-line-default-help-echo nil ; disable mode-line mouseovers
-  mouse-yank-at-point t           ; middle-click paste at point, not at click
-  resize-mini-windows 'grow-only  ; Minibuffer resizing
-  show-help-function nil          ; hide :help-echo text
-  split-width-threshold 160       ; favor horizontal splits
-  uniquify-buffer-name-style 'forward
-  use-dialog-box nil              ; always avoid GUI
-  visible-cursor nil
-  x-stretch-cursor nil
-  ;; defer jit font locking slightly to [try to] improve Emacs performance
-  jit-lock-defer-time nil
-  ;; BMACS - improve cpu usage
-  jit-lock-stealth-nice 0.5
-  jit-lock-stealth-time 1
-  jit-lock-stealth-verbose nil
-  ;; `pos-tip' defaults
-  pos-tip-internal-border-width 6
-  pos-tip-border-width 1
-  ;; no beeping or blinking please
-  ring-bell-function #'ignore
-  visible-bell nil)
-
-  (fset #'yes-or-no-p #'y-or-n-p) ; y/n instead of yes/no
 #+END_SRC
 
-**** TODO Break this apart with comments
-
 **** Line numbers
+
 Enable line numbers
 
 #+BEGIN_SRC emacs-lisp
@@ -1015,54 +946,64 @@ Enable line numbers
 
 *** Editor
 
+**** Bookmarks
+
 #+BEGIN_SRC emacs-lisp
 (setq-default
- vc-follow-symlinks t
- ;; Save clipboard contents into kill-ring before replacing them
- save-interprogram-paste-before-kill t
- ;; Bookmarks
- bookmark-default-file (concat bmacs-etc-dir "bookmarks")
- bookmark-save-flag t
- ;; Formatting
- delete-trailing-lines nil
- fill-column 100
- sentence-end-double-space nil
- word-wrap t
- ;; Scrolling
- hscroll-margin 1
- hscroll-step 1
- scroll-conservatively 1001
- scroll-margin 0
- scroll-preserve-screen-position t
- ;; Whitespace
- indent-tabs-mode nil
- require-final-newline t
- tab-always-indent t
- tab-width 2
- tabify-regexp "^\t* [ \t]+" ; for :retab
- ;; Wrapping
+ bookmark-save-flag 1)  ; automatically save bookmarks after every change
+#+END_SRC
+
+**** Formatting
+
+#+BEGIN_SRC emacs-lisp
+(setq-default
+ fill-column 100                  ; set line-wrapping column to 100
+ ;; TODO: Revisit later and remove if no ill effects
+ ;; sentence-end-double-space nil ; consider period with a single space afterwards end of sentance
+ word-wrap t                     ; enable word wrap so lines are wrapped at nearest space
+ ;; TODO: Investigate these further
  truncate-lines t
- truncate-partial-width-windows 50
+ truncate-partial-width-windows 50)
+
+#+END_SRC
+
+**** Scrolling
+
+#+BEGIN_SRC emacs-lisp
+(setq-default
+ ;; TODO: revisit and remove if default of 5 is satisfactory
+ ;; hscroll-margin 1                    ; how many columns from edge until scrolling start
+ ;; TODO: revisit and remove if default of center point is acceptable
+ ;; hscroll-step 1                      ; only scroll by a single column
+ scroll-conservatively 1001             ; always scroll to the point no matter how far away (don't recenter)
+ scroll-margin 0                        ; don't automatically scroll to retain a margin
+ scroll-preserve-screen-position t)     ; preserve point location on screen when scrolling
+#+END_SRC
+
+**** Whitespace
+
+#+BEGIN_SRC emacs-lisp
+(setq-default
+ indent-tabs-mode nil         ; don't insert tabs by default
+ require-final-newline t      ; ensure newline exists at end of file
+ tab-always-indent t          ; always indent line when pressing TAB (don't add tab character)
+ tab-width 2                  ; default tab width of 2 characters
+ tabify-regexp "^\t* [ \t]+") ; only tabify initial whitespace when converting to tabifying
+
  ;; whitespace-mode
+(setq-default
  whitespace-line-column fill-column
  whitespace-style
- '(face indentation tabs tab-mark spaces space-mark newline newline-mark
-   trailing lines-tail)
+ '(face indentation tabs tab-mark spaces space-mark newline newline-mark trailing lines-tail)
  whitespace-display-mappings
  '((tab-mark ?\t [?› ?\t])
    (newline-mark ?\n [?¬ ?\n])
    (space-mark ?\  [?·] [?.])))
+#+END_SRC
 
+**** Large File Handling
 
-;; revert buffers for changed files
-(global-auto-revert-mode -1)
-(setq auto-revert-verbose nil)
-
-(show-paren-mode)
-
-(push '("/LICENSE$" . text-mode) auto-mode-alist)
-
-
+#+BEGIN_SRC emacs-lisp
 (defun bmacs/check-large-file ()
   "Check if the buffer's file is large (see `bmacs-large-file-size'). If so, ask
 for confirmation to open it literally (read-only, disabled undo and in
@@ -1081,8 +1022,6 @@ fundamental-mode) for performance sake."
 
 (add-hook 'find-file-hook #'bmacs/check-large-file)
 #+END_SRC
-
-**** TODO Break apart?
 
 **** Auto Indent Pasted Code
 
@@ -1127,6 +1066,18 @@ fundamental-mode) for performance sake."
                                                 (region-end))))))
 #+END_SRC
 
+**** Misc
+
+#+BEGIN_SRC emacs-lisp
+(setq-default
+ vc-follow-symlinks t                             ; automatically follow symlinks
+ save-interprogram-paste-before-kill t)           ; save clipboard contents into kill-ring before replacing them
+(global-auto-revert-mode -1)                      ; diable auto revert mode (don't revert changed buffers)
+(show-paren-mode)                                 ; highlight matching parenthesis
+(push '("/LICENSE$" . text-mode) auto-mode-alist) ; license files should be handled in text mode
+#+END_SRC
+
+
 *** Font
 
 #+BEGIN_SRC emacs-lisp
@@ -1135,13 +1086,62 @@ fundamental-mode) for performance sake."
 
 
 *** Help
+
 When opening a help window, always select that window afterwards and move focus to it.
 
 #+BEGIN_SRC emacs-lisp
 (setq help-window-select t)
 #+END_SRC
 
+*** Cool doom exit messages
+
+Displays various "are you sure" messages when exiting emacs.
+
+#+BEGIN_SRC emacs-lisp
+(defun doom-quit-p (&optional prompt)
+  "Return t if this session should be killed. Prompts the user for
+confirmation."
+(or (yes-or-no-p (format "››› %s" (or prompt "Quit Emacs?")))
+    (ignore (message "Aborted"))))
+(setq confirm-kill-emacs nil)
+(add-hook 'kill-emacs-query-functions #'doom-quit-p)
+#+END_SRC
+
+*** Various Settings
+
+Various settings of varying importance.
+
+#+BEGIN_SRC emacs-lisp
+(setq-default
+ ad-redefinition-action 'accept          ; silence advised function warnings
+ apropos-do-all t                        ; make `apropos' more useful
+ compilation-always-kill t               ; kill compilation process before starting another
+ compilation-ask-about-save nil          ; save all buffers on `compile'
+ compilation-scroll-output t             ; scroll to end of compilation output
+ confirm-nonexistent-file-or-buffer t    ; confirm nonexisting files/buffers when opening
+ idle-update-delay 2                     ; update ui less often (performance)
+ warning-minimum-level :error            ; don't show warnings only errors
+ ;; keep the point out of the minibuffer
+ minibuffer-prompt-properties '(read-only t point-entered minibuffer-avoid-prompt face minibuffer-prompt))
+#+END_SRC
+
+*** File Locations
+
+Define various file locations to be used by emacs
+
+#+BEGIN_SRC emacs-lisp
+(setq-default
+ bookmark-default-file        (concat bmacs-etc-dir "bookmarks")
+ abbrev-file-name             (concat bmacs-local-dir "abbrev.el")
+ auto-save-list-file-name     (concat bmacs-cache-dir "autosave")
+ pcache-directory             (concat bmacs-cache-dir "pcache"))
+#+END_SRC
+
 *** Operating System Specific
+
+**** Common
+
+Variables that can be easily used to determine operating system type.
 
 #+BEGIN_SRC emacs-lisp
 (setq IS-LINUX (eq system-type 'gnu/linux)
@@ -1165,7 +1165,7 @@ Use shared system clipboard and don't stream visual changes to clipboard
 
 #+BEGIN_SRC emacs-lisp
 (if IS-LINUX
-  (setq x-gtk-use-system-tooltips nil))
+  (setq x-gtk-use-system-tooltips nil))   ; don't use gtk
 #+END_SRC
 
 **** Mac
@@ -1207,6 +1207,7 @@ Use shared system clipboard and don't stream visual changes to clipboard
 ** Core Packages
 
 *** which-key
+
 Dynamically show keybinding options.
 
 #+BEGIN_SRC emacs-lisp
@@ -1225,6 +1226,7 @@ Dynamically show keybinding options.
 #+END_SRC
 
 *** smartparens
+
 Auto-close delimiters and blocks as you type.
 
 #+BEGIN_SRC emacs-lisp
@@ -1245,6 +1247,9 @@ Auto-close delimiters and blocks as you type.
 
   (sp-local-pair '(xml-mode nxml-mode php-mode) "<!--" "-->"
                  :post-handlers '(("| " "SPC")))
+
+  ;; disable global pairing for `
+  (sp-pair "`" nil)
 
   ;; Auto-close more conservatively
   (let ((unless-list '(sp-point-before-word-p
@@ -2458,8 +2463,7 @@ Vi like tilde's in the fringe for past EOF
   :demand t
   :config
   ;(set! :theme 'doom-one)
-  (load-file (expand-file-name "~/.emacs.d/doom-nord-custom-theme.el"))
-  (load-theme 'doom-nord-custom t)
+  (load-theme 'doom-one t)
 
   ;; improve integration with org-mode
   (add-hook 'bmacs-post-init-hook #'doom-themes-org-config)
@@ -4217,15 +4221,7 @@ It's org-mode ya'll
   (set (make-local-variable 'show-paren-mode) nil)
   (defun +org-sp-point-in-checkbox-p (_id action _context)
     (when (eq action 'insert)
-      (sp--looking-at-p "\\s-*]")))
-
-  ;; make delimiter auto-closing a little more conservative
-  (sp-with-modes 'org-mode
-    (sp-local-pair "*" nil :unless '(sp-point-after-word-p sp-point-before-word-p sp-point-at-bol-p))
-    (sp-local-pair "_" nil :unless '(sp-point-after-word-p sp-point-before-word-p))
-    (sp-local-pair "/" nil :unless '(sp-point-after-word-p sp-point-before-word-p +org-sp-point-in-checkbox-p))
-    (sp-local-pair "~" nil :unless '(sp-point-after-word-p sp-point-before-word-p))
-    (sp-local-pair "=" nil :unless '(sp-point-after-word-p sp-point-before-word-p))))
+      (sp--looking-at-p "\\s-*]"))))
 
 (defun +borg|init ()
   "Run once, when org is first loaded."
@@ -7113,7 +7109,7 @@ _SPC_ cancel	_o_nly this   	_d_elete			_=_ Balance
             (message file-name))
         (error "Buffer not visiting a file"))))
 
-  (defun bmacs/alternate-buffer-old (&optional window)
+  (defun bmacs/alternate-buffer (&optional window)
     "Switch back and forth between current and last buffer in the
   current window."
     (interactive)
@@ -7130,14 +7126,6 @@ _SPC_ cancel	_o_nly this   	_d_elete			_=_ Balance
                        (mapcar #'car (window-prev-buffers window)))
            ;; `other-buffer' honors `buffer-predicate' so no need to filter
            (other-buffer current-buffer t)))))
-
-(defun bmacs/alternate-buffer ()
-  "Switch back and forth between current and last buffer in the
-current perspective."
-  (interactive)
-  (with-persp-buffer-list ()
-                          (switch-to-buffer (other-buffer (current-buffer) t))))
-
 
   (defun bmacs/toggle-fold ()
     (interactive)
@@ -8022,10 +8010,10 @@ Set the various indentations
 #+BEGIN_SRC emacs-lisp
 ;; Override vc modified color (gray -> yellow)
 (custom-set-faces
-  '(diff-hl-change         ((t (:foreground "#ECCC87"))))
-  '(git-gutter:modified    ((t (:foreground "#ECCC87"))))
-  '(git-gutter+-modified   ((t (:foreground "#ECCC87"))))
-  '(git-gutter-fr:modified ((t (:foreground "#ECCC87")))))
+  '(diff-hl-change         ((t (:foreground "#ECBE7B"))))
+  '(git-gutter:modified    ((t (:foreground "#ECBE7B"))))
+  '(git-gutter+-modified   ((t (:foreground "#ECBE7B"))))
+  '(git-gutter-fr:modified ((t (:foreground "#ECBE7B")))))
 
 ;; Override smerge colors
 (custom-set-faces
@@ -8034,20 +8022,20 @@ Set the various indentations
 
 ;; Override evil googles colors
 (custom-set-faces
- '(evil-goggles-delete-face           ((t (:foreground "#ff6655"))))
- '(evil-goggles-paste-face            ((t (:foreground "#99bb66"))))
- '(evil-goggles-yank-face             ((t (:foreground "#5E81AC"))))
- '(evil-goggles-undo-redo-remove-face ((t (:foreground "#ff6655"))))
- '(evil-goggles-undo-redo-add-face    ((t (:foreground "#99bb66"))))
- '(evil-goggles-undo-redo-change-face ((t (:foreground "#5E81AC")))))
+ '(evil-goggles-delete-face           ((t (:foreground "#ff6c6b"))))
+ '(evil-goggles-paste-face            ((t (:foreground "#98be65"))))
+ '(evil-goggles-yank-face             ((t (:foreground "#51afef"))))
+ '(evil-goggles-undo-redo-remove-face ((t (:foreground "#ff6c6b"))))
+ '(evil-goggles-undo-redo-add-face    ((t (:foreground "#98be65"))))
+ '(evil-goggles-undo-redo-change-face ((t (:foreground "#51afef")))))
 
 ;; Override org mode colors
 (custom-set-faces
- '(org-level-1              ((t :foreground "#80A0C2" :inherit nil :height 1.2)))
- '(org-level-2              ((t :foreground "#B58DAE" :inherit nil :height 1.1)))
- '(org-level-3              ((t :foreground "#8EBCBB" :inherit nil :height 1.1)))
- '(org-level-4              ((t :foreground "#ECCC87" :inherit nil :height 1.1)))
- '(org-level-5              ((t :foreground "#D2876D" :inherit nil :height 1.1))))
+ '(org-level-1              ((t :foreground "#51afef" :inherit nil :height 1.2)))
+ '(org-level-2              ((t :foreground "#DCAEEA" :inherit nil :height 1.1)))
+ '(org-level-3              ((t :foreground "#a9a1e1" :inherit nil :height 1.1)))
+ '(org-level-4              ((t :foreground "#ECBE7B" :inherit nil :height 1.1)))
+ '(org-level-5              ((t :foreground "#46D9FF" :inherit nil :height 1.1))))
 #+END_SRC
 
 *** Mardown Open Comamnd
