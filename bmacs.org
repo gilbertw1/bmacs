@@ -29,6 +29,7 @@
     - [[#quiet][quiet!]]
     - [[#def-memoized][def-memoized!]]
     - [[#λ][λ!]]
+  - [[#helper-functions][Helper Functions]]
   - [[#core-settings][Core Settings]]
     - [[#charset][Charset]]
     - [[#libraries][Libraries]]
@@ -47,21 +48,21 @@
     - [[#smartparens][smartparens]]
     - [[#ivy][Ivy]]
     - [[#evil][evil]]
+    - [[#recentf][recentf]]
   - [[#completion][Completion]]
     - [[#swiper][Swiper]]
     - [[#counsel][Counsel]]
     - [[#smex][smex]]
+    - [[#ivy-rich][ivy-rich]]
     - [[#ivy-hydra][ivy-hydra]]
     - [[#company][company]]
     - [[#comany-statistics][comany-statistics]]
     - [[#company-quickhelp][company-quickhelp]]
-    - [[#company-dict---todo---review-commented-out-doom-code][company-dict - TODO - review commented out doom code]]
+    - [[#company-dict][company-dict]]
   - [[#workspaces][Workspaces]]
     - [[#persp-mode][persp-mode]]
-    - [[#eyebrowse-][eyebrowse ?]]
   - [[#editing][Editing]]
     - [[#evil-1][Evil]]
-    - [[#editorconfig][Editorconfig?]]
     - [[#hideshow][hideshow]]
     - [[#undo-tree][undo-tree]]
     - [[#expand-region][expand-region]]
@@ -79,19 +80,16 @@
     - [[#git-link][git-link]]
     - [[#evil-magit][evil-magit]]
     - [[#smerge][smerge]]
-    - [[#magithub-disabled][magithub (disabled)]]
   - [[#ui-1][UI]]
     - [[#all-the-icons][all-the-icons]]
     - [[#vi-tilde-fringe][vi-tilde-fringe]]
     - [[#doom-themes][doom-themes]]
     - [[#doom-dashboard][doom-dashboard]]
     - [[#doom-modeline][doom-modeline]]
-    - [[#doom-modeline-1][doom-modeline]]
     - [[#doom-quit][doom-quit]]
     - [[#evil-goggles][evil-goggles]]
     - [[#hl-todo][hl-todo]]
     - [[#nav-flash][nav-flash]]
-    - [[#solaire-mode][solaire-mode]]
     - [[#fringe-helper][fringe-helper]]
     - [[#highlight-indentation][highlight-indentation]]
     - [[#highlight-numbers][highlight-numbers]]
@@ -102,20 +100,18 @@
     - [[#winner-mode][winner-mode]]
   - [[#project][Project]]
     - [[#projectile][projectile]]
-  - [[#buffers][Buffers]]
-    - [[#recentf][recentf]]
   - [[#navigation][Navigation]]
     - [[#ace-link][ace-link]]
     - [[#ace-window][ace-window]]
     - [[#avy][avy]]
     - [[#wgrep][wgrep]]
     - [[#dumb-jump][dumb-jump]]
-  - [[#org-mode][Org Mode]]
+  - [[#org-mode-needs-cleaning][Org Mode (Needs Cleaning)]]
     - [[#org][Org]]
     - [[#babel][Babel]]
     - [[#capture][Capture]]
     - [[#present][Present]]
-  - [[#email][Email]]
+  - [[#email-needs-cleaning][Email (Needs Cleaning)]]
     - [[#fix-mark-emails-in-region][Fix Mark Emails in Region]]
   - [[#tools][Tools]]
     - [[#restclient][Restclient]]
@@ -124,7 +120,6 @@
     - [[#eshell][EShell]]
     - [[#imenu][Imenu]]
     - [[#neotree][NeoTree]]
-    - [[#term][Term]]
   - [[#programming-languages][Programming Languages]]
     - [[#assembly][Assembly]]
     - [[#cc][CC]]
@@ -813,6 +808,17 @@ have the same meaning as in `defun'."
 
 #+END_SRC
 
+** Helper Functions
+
+#+BEGIN_SRC emacs-lisp
+(defun bmacs-project-root ()
+  "Get the path to the root of your project.
+If STRICT-P, return nil if no project was found, otherwise return
+`default-directory'."
+  (let (projectile-require-project-root)
+    (projectile-project-root)))
+#+END_SRC
+
 ** Core Settings
 
 *** Charset
@@ -958,8 +964,6 @@ Enable line numbers
 #+BEGIN_SRC emacs-lisp
 (setq-default
  fill-column 100                  ; set line-wrapping column to 100
- ;; TODO: Revisit later and remove if no ill effects
- ;; sentence-end-double-space nil ; consider period with a single space afterwards end of sentance
  word-wrap t                     ; enable word wrap so lines are wrapped at nearest space
  ;; TODO: Investigate these further
  truncate-lines t
@@ -971,10 +975,6 @@ Enable line numbers
 
 #+BEGIN_SRC emacs-lisp
 (setq-default
- ;; TODO: revisit and remove if default of 5 is satisfactory
- ;; hscroll-margin 1                    ; how many columns from edge until scrolling start
- ;; TODO: revisit and remove if default of center point is acceptable
- ;; hscroll-step 1                      ; only scroll by a single column
  scroll-conservatively 1001             ; always scroll to the point no matter how far away (don't recenter)
  scroll-margin 0                        ; don't automatically scroll to retain a margin
  scroll-preserve-screen-position t)     ; preserve point location on screen when scrolling
@@ -1233,11 +1233,7 @@ Auto-close delimiters and blocks as you type.
 (use-package smartparens
   :demand t
   :config
-  (setq sp-autowrap-region nil ; let evil-surround handle this
-        sp-highlight-pair-overlay nil
-        sp-cancel-autoskip-on-backward-movement nil
-        sp-show-pair-delay 0
-        sp-max-pair-length 3)
+  (setq sp-autowrap-region nil) ; let evil-surround handle this
 
   (require 'smartparens-config)
 
@@ -1249,20 +1245,7 @@ Auto-close delimiters and blocks as you type.
                  :post-handlers '(("| " "SPC")))
 
   ;; disable global pairing for `
-  (sp-pair "`" nil)
-
-  ;; Auto-close more conservatively
-  (let ((unless-list '(sp-point-before-word-p
-                       sp-point-after-word-p
-                       sp-point-before-same-p)))
-    (sp-pair "'"  nil :unless unless-list)
-    (sp-pair "\"" nil :unless unless-list))
-  (sp-pair "{" nil :post-handlers '(("||\n[i]" "RET") ("| " " "))
-           :unless '(sp-point-before-word-p sp-point-before-same-p))
-  (sp-pair "(" nil :post-handlers '(("||\n[i]" "RET") ("| " " "))
-           :unless '(sp-point-before-word-p sp-point-before-same-p))
-  (sp-pair "[" nil :post-handlers '(("| " " "))
-           :unless '(sp-point-before-word-p sp-point-before-same-p))
+  (sp-pair "`" nil :actions :rem)
 
   (smartparens-global-mode))
 #+END_SRC
@@ -1276,107 +1259,60 @@ They power and the glory! Generic complete anything frontend
   :init
   (add-hook 'bmacs-post-init-hook #'ivy-mode)
   :config
-  (setq ivy-height 12
-        ivy-wrap t
-        ivy-fixed-height-minibuffer t
-        projectile-completion-system 'ivy
-        smex-completion-method 'ivy
-        ;; Don't use ^ as initial input
-        ivy-initial-inputs-alist nil
-        ;; highlight til EOL
-        ivy-format-function #'ivy-format-function-line
-        ;; disable magic slash on non-match
-        ivy-magic-slash-non-match-action nil
-        ;; BMACS allow input prompt value to be selectable
-        ivy-use-selectable-prompt t)
+  (setq ivy-height 12                                  ; slightly longer ivy completions list
+        ivy-wrap t                                     ; wrap around at end of completions list
+        ivy-fixed-height-minibuffer t                  ; use consistent height for ivy
+        projectile-completion-system 'ivy              ; use ivy for projectile
+        smex-completion-method 'ivy                    ; use ivy for smex
+        ivy-initial-inputs-alist nil                   ; don't use ^ as initial input
+        ivy-format-function #'ivy-format-function-line ; highlight til EOL
+        ivy-magic-slash-non-match-action nil           ; disable magic slash on non-match
+        ivy-use-selectable-prompt t)                   ; allow input prompt value to be selectable
 
+  ;; Use ivy for magit
   (after! magit     (setq magit-completing-read-function #'ivy-completing-read))
+  ;; use
   (after! yasnippet (push #'+ivy-yas-prompt yas-prompt-functions))
 
-  (map! [remap apropos]                   #'counsel-apropos
-        [remap describe-face]             #'counsel-describe-face
-        [remap find-file]                 #'counsel-find-file
-        [remap switch-to-buffer]          #'ivy-switch-buffer
-        ;[remap persp-switch-to-buffer]    #'+ivy/switch-workspace-buffer TODO
-        [remap recentf-open-files]        #'counsel-recentf
-        [remap imenu]                     #'counsel-imenu
-        [remap bookmark-jump]             #'counsel-bookmark
-        [remap projectile-switch-project] #'counsel-projectile-switch-project
-        [remap projectile-find-file]      #'counsel-projectile-find-file
-        [remap imenu-anywhere]            #'ivy-imenu-anywhere
-        [remap execute-extended-command]  #'counsel-M-x
-        [remap describe-function]         #'counsel-describe-function
-        [remap describe-variable]         #'counsel-describe-variable
-        [remap describe-face]             #'counsel-describe-face)
+  (map! [remap switch-to-buffer]       #'ivy-switch-buffer
+        [remap persp-switch-to-buffer] #'counsel-projectile-switch-to-buffer
+        [remap imenu-anywhere]         #'ivy-imenu-anywhere)
 
-  (eval-and-compile
-    (defsubst +ivy--icon-for-mode (mode)
-      "Apply `all-the-icons-for-mode' on MODE but either return an icon or nil."
-      (let ((icon (all-the-icons-icon-for-mode mode)))
-        (unless (symbolp icon) icon))))
-
-  (defun +ivy-buffer-transformer (str)
-    (let* ((buf (get-buffer str))
-           (path (buffer-file-name buf))
-           (mode (buffer-local-value 'major-mode buf))
-           (faces
-            (with-current-buffer buf
-              (cond ((string-match-p "^ ?\\*" (buffer-name buf))
-                     'font-lock-comment-face)
-                    ((buffer-modified-p buf)
-                     'doom-modeline-buffer-modified) ;; TODO ?
-                    (buffer-read-only
-                     'error)))))
-      (propertize
-       (format "%-40s %s%-20s %s"
-               str
-                   (concat (propertize " " 'display
-                                       (or (+ivy--icon-for-mode mode)
-                                           (+ivy--icon-for-mode (get mode 'derived-mode-parent))))
-                           "\t")
-               mode
-               (or (and path (abbreviate-file-name (file-name-directory (file-truename path))))
-                   ""))
-       'face faces)))
-
-  ;; Show more buffer information in switch-buffer commands
-  (ivy-set-display-transformer #'ivy-switch-buffer #'+ivy-buffer-transformer)
-  (ivy-set-display-transformer #'ivy-switch-buffer-other-window #'+ivy-buffer-transformer)
-
-  ;; Don't sort perp mode related lists
+  ;; Don't sort persp mode related lists
   (nconc ivy-sort-functions-alist
          '((persp-kill-buffer   . nil)
            (persp-remove-buffer . nil)
            (persp-add-buffer    . nil)
            (persp-switch        . nil)
            (persp-window-switch . nil)
-           (persp-frame-switch  . nil))))
+           (persp-frame-switch  . nil)
+           (+workspace/switch-to . nil)
+           (+workspace/delete . nil))))
 #+END_SRC
 
 *** evil
+
 Like vim but better.
 
 #+BEGIN_SRC emacs-lisp
 (use-package evil
   :demand t
   :init
-  (setq evil-want-C-u-scroll t
-        evil-want-visual-char-semi-exclusive t
-        evil-want-Y-yank-to-eol t
-        evil-magic t
-        evil-echo-state t
-        evil-indent-convert-tabs t
-        evil-ex-search-vim-style-regexp t
-        evil-ex-substitute-global t
-        evil-ex-visual-char-range t  ; column range for ex commands
-        evil-insert-skip-empty-lines t
-        evil-mode-line-format 'nil
-        ;; more vim-like behavior
-        evil-symbol-word-search t
-        ;; don't activate mark on shift-click
-        shift-select-mode nil)
+  (setq evil-want-C-u-scroll t                  ; C-u scrolls up
+        evil-want-visual-char-semi-exclusive t  ; don't include new line in visual selection
+        evil-want-Y-yank-to-eol t               ; 'Y' yanks to end of line
+        evil-echo-state t                       ; signal current state in echo area
+        evil-indent-convert-tabs t              ; automatically convert tabs or spaces to desired type
+        evil-magic t                            ; use vim patterns in search
+        evil-ex-search-vim-style-regexp t       ; support vim style backslash codes
+        evil-ex-substitute-global t             ; global substitute patterns
+        evil-ex-visual-char-range t             ; column range for ex commands
+        evil-mode-line-format 'nil              ; don't have evil show modeline tag
+        evil-symbol-word-search t               ; more vim-like behavior
+        shift-select-mode nil)                  ; don't activate mark on shift-click
 
   :config
+  ;; use evil-search for searching
   (evil-select-search-module 'evil-search-module 'evil-search)
 
   ;; Set cursor colors later, once theme is loaded
@@ -1619,6 +1555,7 @@ I like to prevent evil from yanking text to the clipboard in many scenarios.
                   (nth 3 evil-last-paste)
                   (nth 4 evil-last-paste)
                   t)))))
+
 (defun +evil/visual-indent ()
   (interactive)
   (evil-shift-right (region-beginning) (region-end))
@@ -1631,6 +1568,18 @@ I like to prevent evil from yanking text to the clipboard in many scenarios.
   (evil-normal-state)
   (evil-visual-restore))
 
+#+END_SRC
+
+*** recentf
+
+#+BEGIN_SRC emacs-lisp
+(use-package recentf
+  :demand t
+  :config
+  (setq recentf-save-file (concat bmacs-etc-dir "recentf")
+      recentf-max-menu-items 0
+      recentf-max-saved-items 300)
+  (recentf-mode))
 #+END_SRC
 
 ** Completion
@@ -1647,7 +1596,30 @@ Making everything all ivy-ed up.
 
 #+BEGIN_SRC emacs-lisp
 (use-package counsel-projectile
+  :init
+  (map! [remap apropos]                  #'counsel-apropos
+        [remap bookmark-jump]            #'counsel-bookmark
+        [remap describe-face]            #'counsel-describe-face
+        [remap describe-function]        #'counsel-describe-function
+        [remap describe-variable]        #'counsel-describe-variable
+        [remap execute-extended-command] #'counsel-M-x
+        [remap find-file]                #'counsel-find-file
+        [remap find-library]             #'counsel-find-library
+        [remap info-lookup-symbol]       #'counsel-info-lookup-symbol
+        [remap imenu]                    #'counsel-imenu
+        [remap recentf-open-files]       #'counsel-recentf
+        [remap org-capture]              #'counsel-org-capture
+        [remap swiper]                   #'counsel-grep-or-swiper)
   :config
+  (defun +ivy-projectile-find-file-transformer (str)
+  "Highlight entries that have been visited. This is the opposite of
+`counsel-projectile-find-file'."
+    (cond ((get-file-buffer (projectile-expand-root str))
+           (propertize str 'face '(:weight ultra-bold :slant italic)))
+          (t str)))
+  (ivy-set-display-transformer #'counsel-projectile-find-file #'+ivy-projectile-find-file-transformer)
+
+  ;; Find in project using current word or selection
   (defun counsel-projectile-rg-initial (&optional value)
     "Ivy version of `projectile-rg'."
     (interactive)
@@ -1676,18 +1648,25 @@ Making everything all ivy-ed up.
   (require 'counsel-projectile)
   (setq counsel-find-file-ignore-regexp "\\(?:^[#.]\\)\\|\\(?:[#~]$\\)\\|\\(?:^Icon?\\)")
 
-  ;; Configure `counsel-rg', `counsel-ag' & `counsel-pt'
+  ;; Add action to open in other window during search
   (dolist (cmd '(counsel-ag counsel-rg counsel-pt))
     (ivy-add-actions
      cmd
      '(("O" +ivy-git-grep-other-window-action "open in other window"))))
 
+  (defun +ivy-recentf-transformer (str)
+    "Dim recentf entries that are not in the current project of the buffer you
+  started `counsel-recentf' from. Also uses `abbreviate-file-name'."
+    (let ((str (abbreviate-file-name str)))
+      (if (file-in-directory-p str (bmacs-project-root))
+          str
+        (propertize str 'face 'ivy-virtual))))
 
-  (ivy-set-display-transformer #'counsel-projectile-switch-to-buffer #'+ivy-buffer-transformer)
-  (ivy-set-display-transformer #'counsel-recentf #'abbreviate-file-name))
+  (ivy-set-display-transformer #'counsel-recentf #'+ivy-recentf-transformer))
 #+END_SRC
 
 *** smex
+
 Improved M-x
 
 #+BEGIN_SRC emacs-lisp
@@ -1699,7 +1678,33 @@ Improved M-x
 #+END_SRC
 
 
+*** ivy-rich
+
+Provide more information in ivy buffers list.
+
+#+BEGIN_SRC emacs-lisp
+(use-package ivy-rich
+  :after ivy
+  :config
+  (dolist (cmd '(ivy-switch-buffer counsel-projectile-switch-to-buffer))
+  (defun +ivy-buffer-transformer (str)
+    "Dim special buffers, buffers whose file aren't in the current buffer, and
+  virtual buffers. Uses `ivy-rich' under the hood."
+    (let ((buf (get-buffer str)))
+      (require 'ivy-rich)
+      (cond (buf (ivy-rich-switch-buffer-transformer str))
+            ((and (eq ivy-virtual-abbreviate 'full)
+                  ivy-rich-switch-buffer-align-virtual-buffer)
+             (ivy-rich-switch-buffer-virtual-buffer str))
+            ((eq ivy-virtual-abbreviate 'full)
+             (propertize (abbreviate-file-name str) 'str 'ivy-virtual))
+            (t (propertize str 'face 'ivy-virtual)))))
+
+    (ivy-set-display-transformer cmd '+ivy-buffer-transformer)))
+#+END_SRC
+
 *** ivy-hydra
+
 Nice ivy hydra
 
 #+BEGIN_SRC emacs-lisp
@@ -1761,13 +1766,12 @@ Generic code auto completion
   :commands (company-mode global-company-mode company-complete
              company-complete-common company-manual-begin company-grab-line)
   :config
-  (setq company-idle-delay nil
+  (setq company-idle-delay 0.1
         company-tooltip-limit 10
         company-dabbrev-downcase nil
         company-dabbrev-ignore-case nil
         company-dabbrev-code-other-buffers t
         company-tooltip-align-annotations t
-        company-idle-delay 0.1
         company-minimum-prefix-length 3
         company-require-match 'never
         company-global-modes '(not eshell-mode comint-mode erc-mode message-mode help-mode gud-mode)
@@ -1787,7 +1791,6 @@ Generic code auto completion
   (when (and (company-manual-begin)
              (= company-candidates-length 1))
     (company-complete-common)))
-
 #+END_SRC
 
 *** comany-statistics
@@ -1812,19 +1815,12 @@ Show documentation popups for company
   (company-quickhelp-mode +1))
 #+END_SRC
 
-*** company-dict - TODO - review commented out doom code
+*** company-dict
 Dictionary based completions in company
 
 #+BEGIN_SRC emacs-lisp
   (use-package company-dict
     :commands company-dict)
-    ;; :config
-    ;; (defun +company|enable-project-dicts (mode &rest _)
-    ;;   "Enable per-project dictionaries."
-    ;;   (if (symbol-value mode)
-    ;;       (cl-pushnew mode company-dict-minor-mode-list :test #'eq)
-    ;;     (setq company-dict-minor-mode-list (delq mode company-dict-minor-mode-list))))
-    ;; (add-hook 'doom-project-hook #'+company|enable-project-dicts))
 #+END_SRC
 
 ** Workspaces
@@ -1886,8 +1882,6 @@ Allows for creation of isolated workspaces
 #+END_SRC
 
 
-*** TODO eyebrowse ?
-
 ** Editing
 
 *** Evil
@@ -1911,98 +1905,17 @@ I like to move it move it
   :config
   (let ((prefix "g"))
     (evilem-default-keybindings prefix)
-    (evilem-define (kbd (concat prefix " l")) #'evil-forward-word-begin :scope 'line)
-    (evilem-define (kbd (concat prefix " h")) #'evil-backward-word-begin :scope 'line)
-    (evilem-define (kbd (concat prefix " L")) #'evil-forward-WORD-begin :scope 'line)
-    (evilem-define (kbd (concat prefix " H")) #'evil-backward-WORD-begin :scope 'line)
-    (evilem-define (kbd (concat prefix " (")) #'evil-backward-sentence-begin)
-    (evilem-define (kbd (concat prefix " )")) #'evil-forward-sentence-begin)
-    (evilem-define (kbd (concat prefix " n")) #'evil-ex-search-next)
-    (evilem-define (kbd (concat prefix " N")) #'evil-ex-search-previous))
-  (map! :nv "gg" 'evil-goto-first-line))
+    (map! :prefix "g"
+          :nv "l" #'evilem-motion-forward-word-begin
+          :nv "h" #'evilem-motion-backward-word-begin
+          :nv "L" #'evilem-motion-forward-WORD-begin
+          :nv "H" #'evilem-motion-backward-WORD-begin
+          :nv "(" #'evilem-motion-forward-sentance-begin
+          :nv ")" #'evilem-motion-backward-sentance-begin
+          :nv "n" #'evilem-motion-search-next
+          :nv "N" #'evilem-motion-search-previous
+          :nv "g" #'evil-goto-first-line)))
 #+END_SRC
-
-**** TODO evil-embrace - check this one out further
-
-#+BEGIN_SRC emacs-lisp
-(use-package evil-embrace
-  :after evil-surround
-  :config
-  (setq evil-embrace-show-help-p nil)
-  (evil-embrace-enable-evil-surround-integration)
-
-  (defun +evil--embrace-get-pair (char)
-    (if-let* ((pair (cdr-safe (assoc (string-to-char char) evil-surround-pairs-alist))))
-        pair
-      (if-let* ((pair (assoc-default char embrace--pairs-list)))
-          (if-let* ((real-pair (and (functionp (embrace-pair-struct-read-function pair))
-                                    (funcall (embrace-pair-struct-read-function pair)))))
-              real-pair
-            (cons (embrace-pair-struct-left pair) (embrace-pair-struct-right pair)))
-        (cons char char))))
-
-  (defun +evil--embrace-escaped ()
-    "Backslash-escaped surround character support for embrace."
-    (let ((char (read-char "\\")))
-      (if (eq char 27)
-          (cons "" "")
-        (let ((pair (+evil--embrace-get-pair (string char)))
-              (text (if (sp-point-in-string) "\\\\%s" "\\%s")))
-          (cons (format text (car pair))
-                (format text (cdr pair)))))))
-
-  (defun +evil--embrace-latex ()
-    "LaTeX command support for embrace."
-    (cons (format "\\%s{" (read-string "\\")) "}"))
-
-  (defun +evil--embrace-elisp-fn ()
-    "Elisp function support for embrace."
-    (cons (format "(%s " (or (read-string "(") "")) ")"))
-
-  ;; Add escaped-sequence support to embrace
-  (cl-pushnew (cons ?\\ (make-embrace-pair-struct
-                         :key ?\\
-                         :read-function #'+evil--embrace-escaped
-                         :left-regexp "\\[[{(]"
-                         :right-regexp "\\[]})]"))
-              (default-value 'embrace--pairs-list)
-              :key #'car)
-
-  ;; Add extra pairs
-  (add-hook 'LaTeX-mode-hook #'embrace-LaTeX-mode-hook)
-  (add-hook 'org-mode-hook   #'embrace-org-mode-hook)
-  (add-hook 'emacs-lisp-mode #'(lambda ()
-    (embrace-add-pair ?\` "`" "'")))
-  (add-hook 'emacs-lisp-mode #'(lambda ()
-    (embrace-add-pair-regexp ?f "([^ ]+ " ")" #'+evil--embrace-elisp-fn)))
-  (add-hook 'lisp-mode #'(lambda ()
-    (embrace-add-pair-regexp ?f "([^ ]+ " ")" #'+evil--embrace-elisp-fn)))
-  (add-hook 'org-mode (lambda ()
-    (embrace-add-pair-regexp ?l "\\[a-z]+{" "}" #'+evil--embrace-latex)))
-  (add-hook 'LaTeX-mode (lambda ()
-    (embrace-add-pair-regexp ?l "\\[a-z]+{" "}" #'+evil--embrace-latex))))
-
-#+END_SRC
-
-**** evil-escape
-Escape everything TODO
-
-#+BEGIN_SRC emacs-lisp
-(use-package evil-escape
-  :commands evil-escape-mode
-  :init
-  (setq evil-escape-excluded-states '(normal visual multiedit emacs motion)
-        evil-escape-key-sequence nil
-        evil-escape-excluded-major-modes '(neotree-mode)
-        evil-escape-delay 0.25)
-  (add-hook 'bmacs-post-init-hook #'evil-escape-mode)
-  :config
-  ;; no `evil-escape' in minibuffer
-  (cl-pushnew #'minibufferp evil-escape-inhibit-functions :test #'eq)
-  (map! :irvo "C-g" #'evil-escape))
-
-#+END_SRC
-
 
 **** evil-matchit
 Jump between matching delimiters
@@ -2052,9 +1965,6 @@ Multiple cursors!
                    (evil-paste-after-without-register . ((:default . evil-mc-execute-default-evil-paste)))
                    (evil-paste-before-without-register . ((:default . evil-mc-execute-default-evil-paste)))))
       (push commands evil-mc-custom-known-commands))
-
-    ;; disable evil-escape in evil-mc; causes unwanted text on invocation
-    (push 'evil-escape-mode evil-mc-incompatible-minor-modes)
 
     (defun evil-mc-maybe-run-cursors-before ()
       "Runs `evil-mc-cursors-before' if there are no cursors created yet."
@@ -2188,8 +2098,6 @@ When used in the terminal over ssh, this allows emacs to properly update the cur
        :config (evil-terminal-cursor-changer-activate)))
 #+END_SRC
 
-*** TODO Editorconfig?
-
 *** hideshow
 Allows code folding
 
@@ -2245,7 +2153,7 @@ Everyone knows iedit!
         :n [escape] 'iedit-quit))
 #+END_SRC
 
-*** TODO yasnippet?
+*** yasnippet?
 
 *** flycheck
 Check syntax!
@@ -2403,20 +2311,6 @@ repository root."
         (defalias #'smerge-diff-upper-lower #'smerge-diff-mine-other)
         (defalias #'smerge-diff-base-lower #'smerge-diff-base-other))))
 
-#+END_SRC
-
-*** magithub (disabled)
-
-#+BEGIN_SRC emacs-lisp :tangle no
-(use-package magithub
-  :ensure t
-  :after magit
-  :init
-  (setq magithub-dir (concat bmacs-cache-dir "magithub"))
-  (setq magithub-cache t)
-  :config
-  (magithub-feature-autoinject t)
-  (load "magithub-issue-view.el"))
 #+END_SRC
 
 ** UI
@@ -3486,8 +3380,6 @@ Returns \"\" to not break --no-window-system."
 
 #+END_SRC
 
-*** TODO doom-modeline
-
 *** doom-quit
 Quit prompt with messages
 
@@ -3613,26 +3505,6 @@ for comment start/end characters."
     (advice-add #'evil-window-top    :after #'bmacs/blink-cursor)
     (advice-add #'evil-window-middle :after #'bmacs/blink-cursor)
     (advice-add #'evil-window-bottom :after #'bmacs/blink-cursor)))
-
-#+END_SRC
-
-*** solaire-mode
-Praise the sun!
-
-#+BEGIN_SRC emacs-lisp
-; (use-package solaire-mode
-;   :commands (solaire-mode turn-on-solaire-mode turn-off-solaire-mode)
-;   :init
-;   (add-hook 'after-change-major-mode-hook #'turn-on-solaire-mode)
-;   :config
-;   ;(setq solaire-mode-real-buffer-fn #'doom-real-buffer-p) TODO
-;   (add-hook 'bmacs-post-init-hook #'solaire-mode-swap-bg t)
-;
-;   ;; Extra modes to activate doom-buffer-mode in
-;   (add-hook 'gist-mode #'solaire-mode)
-;   (add-hook 'mu4e-view-mode #'solaire-mode)
-;   (add-hook 'org-tree-slide-mode #'solaire-mode)
-;   (add-hook '+regex-mode #'solaire-mode))
 
 #+END_SRC
 
@@ -3809,28 +3681,6 @@ Project support anywhere, for any project
     (unless (file-remote-p default-directory)
       (apply orig-fn args)))
   (advice-add #'projectile-locate-dominating-file :around #'bmacs--projectile-locate-dominating-file))
-
-(defun bmacs-project-root ()
-  "Get the path to the root of your project.
-If STRICT-P, return nil if no project was found, otherwise return
-`default-directory'."
-  (let (projectile-require-project-root)
-    (projectile-project-root)))
-
-#+END_SRC
-
-** Buffers
-
-*** recentf
-
-#+BEGIN_SRC emacs-lisp
-(use-package recentf
-  :demand t
-  :config
-  (setq recentf-save-file (concat bmacs-etc-dir "recentf")
-      recentf-max-menu-items 0
-      recentf-max-saved-items 300)
-  (recentf-mode))
 #+END_SRC
 
 ** Navigation
@@ -3917,9 +3767,7 @@ Jump to any definition ... the dumb way!
   (bmacs/jump-definition t))
 #+END_SRC
 
-**** TODO Pull over the jump/search online stuff
-
-** Org Mode
+** Org Mode (Needs Cleaning)
 It's org-mode ya'll
 
 *** Org
@@ -4654,17 +4502,13 @@ between the two."
         "<f7>" #'+org-present/next))
 #+END_SRC
 
-** Email
+** Email (Needs Cleaning)
 
 Configuration
 
 #+BEGIN_SRC emacs-lisp
   (defvar +email-mu4e-mail-path "~/.mail"
     "The directory path of mu's maildir.")
-
-  ;;
-  ;; Plugins
-  ;;
 
   (use-package mu4e
     :ensure nil
@@ -5355,8 +5199,6 @@ TODO - I really have no idea
 
 (setq doom-neotree-file-icons t)
 #+END_SRC
-
-*** TODO Term
 
 ** Programming Languages
 
@@ -7407,8 +7249,6 @@ session)."
  "M-0"    (λ! (text-scale-set 0))
  "M-="    #'text-scale-increase
  "M--"    #'text-scale-decrease
- ;; Evil Escape
- [escape] #'evil-escape
  ;; Temporary escape into emacs mode
  :e [C-escape] #'evil-normal-state
  :n [C-escape] #'evil-emacs-state
