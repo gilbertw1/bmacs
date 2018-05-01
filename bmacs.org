@@ -70,6 +70,7 @@
     - [[#iedit---todo-experiment-removing-this][iedit - TODO: experiment removing this]]
     - [[#yasnippet][yasnippet]]
     - [[#yasnippet-snippets][yasnippet-snippets]]
+    - [[#auto-yasnippet][auto-yasnippet]]
     - [[#flycheck][flycheck]]
   - [[#git][Git]]
     - [[#magit][Magit]]
@@ -2245,6 +2246,15 @@ buggy behavior when <delete> is pressed in an empty field."
   :after yasnippet)
 #+END_SRC
 
+*** auto-yasnippet
+
+#+begin_src emacs-lisp
+(use-package auto-yasnippet
+  :commands (aya-create aya-expand aya-open-line aya-persist-snippet)
+  :config
+  (setq aya-persist-snippets-dir (concat bmacs-local-dir "auto-snippets/")))
+#+end_src
+
 *** flycheck
 Check syntax!
 
@@ -4329,7 +4339,7 @@ between the two."
 
   (defun +borg|remove-occur-highlights ()
     "Remove org occur highlights on ESC in normal mode."
-    (when (derived-mode-p 'org-mode)
+    (when org-occur-highlights
       (org-remove-occur-highlights)
       t))
   (add-hook 'bmacs-escape-hook #'+borg|remove-occur-highlights))
