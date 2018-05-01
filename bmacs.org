@@ -62,13 +62,14 @@
   - [[#workspaces][Workspaces]]
     - [[#persp-mode][persp-mode]]
   - [[#editing][Editing]]
-    - [[#evil-1][Evil]]
+    - [[#evil-1][evil]]
     - [[#hideshow][hideshow]]
     - [[#undo-tree][undo-tree]]
     - [[#expand-region][expand-region]]
     - [[#clean-aindent-mode][clean-aindent-mode]]
     - [[#iedit---todo-experiment-removing-this][iedit - TODO: experiment removing this]]
-    - [[#yasnippet][yasnippet?]]
+    - [[#yasnippet][yasnippet]]
+    - [[#yasnippet-snippets][yasnippet-snippets]]
     - [[#flycheck][flycheck]]
   - [[#git][Git]]
     - [[#magit][Magit]]
@@ -256,6 +257,13 @@ different types of files.
 (defvar bmacs-post-init-hook nil
   "A list of hooks run after BMACS initialization is complete, and after
 `bmacs-init-hook'.")
+
+(defvar bmacs-escape-hook nil
+  "A hook run after C-g is pressed (or ESC in normal mode, for evil users). Both
+trigger `doom/escape'.
+
+If any hook returns non-nil, all hooks after it are ignored.")
+
 #+END_SRC
 
 *** Large File Handling
@@ -817,6 +825,21 @@ If STRICT-P, return nil if no project was found, otherwise return
 `default-directory'."
   (let (projectile-require-project-root)
     (projectile-project-root)))
+
+(defun bmacs/escape ()
+  "Run the `bmacs-escape-hook'."
+  (interactive)
+  (cond ((minibuffer-window-active-p (minibuffer-window))
+         ;; quit the minibuffer if open.
+         (abort-recursive-edit))
+        ;; Run all escape hooks. If any returns non-nil, then stop there.
+        ((run-hook-with-args-until-success 'bmacs-escape-hook))
+        ;; don't abort macros
+        ((or defining-kbd-macro executing-kbd-macro) nil)
+        ;; Back to the default
+        (t (keyboard-quit))))
+
+(global-set-key [remap keyboard-quit] #'bmacs/escape)
 #+END_SRC
 
 ** Core Settings
@@ -1269,11 +1292,6 @@ They power and the glory! Generic complete anything frontend
         ivy-magic-slash-non-match-action nil           ; disable magic slash on non-match
         ivy-use-selectable-prompt t)                   ; allow input prompt value to be selectable
 
-  ;; Use ivy for magit
-  (after! magit     (setq magit-completing-read-function #'ivy-completing-read))
-  ;; use
-  (after! yasnippet (push #'+ivy-yas-prompt yas-prompt-functions))
-
   (map! [remap switch-to-buffer]       #'ivy-switch-buffer
         [remap persp-switch-to-buffer] #'counsel-projectile-switch-to-buffer
         [remap imenu-anywhere]         #'ivy-imenu-anywhere)
@@ -1330,6 +1348,14 @@ Like vim but better.
   (dolist (mode '(help-mode debugger-mode))
     (evil-set-initial-state mode 'normal))
 
+  (defun +evil|disable-highlights ()
+    "Disable ex search buffer highlights."
+    (when (evil-ex-hl-active-p 'evil-ex-search)
+      (evil-ex-nohighlight)
+      t))
+  (add-hook 'bmacs-escape-hook #'+evil|disable-highlights)
+
+
   ;; make `try-expand-dabbrev' from `hippie-expand' work in minibuffer
   ;; @see `he-dabbrev-beg', so we need re-define syntax for '/'
   (defun minibuffer-inactive-mode-hook-setup ()
@@ -1339,23 +1365,9 @@ Like vim but better.
   (add-hook 'minibuffer-inactive-mode-hook #'minibuffer-inactive-mode-hook-setup)
 
   ;; --- evil hacks -------------------------
-  (defvar +evil-esc-hook '(t)
-    "A hook run after ESC is pressed in normal mode (invoked by
-`evil-force-normal-state'). If any hook returns non-nil, all hooks after it are
-ignored.")
 
-  (defun +evil*attach-escape-hook ()
-    "Run the `+evil-esc-hook'."
-    (cond ((minibuffer-window-active-p (minibuffer-window))
-           ;; quit the minibuffer if open.
-           (abort-recursive-edit))
-          ((evil-ex-hl-active-p 'evil-ex-search)
-           ;; disable ex search buffer highlights.
-           (evil-ex-nohighlight))
-          (t
-           ;; Run all escape hooks. If any returns non-nil, then stop there.
-           (run-hook-with-args-until-success '+evil-esc-hook))))
-  (advice-add #'evil-force-normal-state :after #'+evil*attach-escape-hook)
+  ;; Make ESC (from normal mode) the universal escaper. See `bmacs-escape-hook'.
+  (advice-add #'evil-force-normal-state :after #'bmacs/escape)
 
   (defun +evil*restore-normal-state-on-windmove (orig-fn &rest args)
     "If in anything but normal or motion mode when moving to another window,
@@ -1437,15 +1449,6 @@ across windows."
 
   (dolist (sym '(evil-ex-global evil-ex-global-inverted))
     (evil-set-command-property sym :ex-arg 'global-delim-match))
-
-  ;; Move to new split -- setting `evil-split-window-below' &
-  ;; `evil-vsplit-window-right' to non-nil mimics this, but that doesn't update
-  ;; window history. That means when you delete a new split, Emacs leaves you on
-  ;; the 2nd to last window on the history stack, which is jarring.
-  (defun +evil*window-follow (&rest _)  (evil-window-down 1))
-  (defun +ertmp://rtmp.stream.live:1935/live/9da5fd3f-239b-4a20-b795-e977e39ba752vil*window-vfollow (&rest _) (evil-window-right 1))
-  (advice-add #'evil-window-split  :after #'+evil*window-follow)
-  (advice-add #'evil-window-vsplit :after #'+evil*window-vfollow)
 
   (evil-mode))
 #+END_SRC
@@ -1884,7 +1887,7 @@ Allows for creation of isolated workspaces
 
 ** Editing
 
-*** Evil
+*** evil
 
 **** evil-commentary
 Robust commenting support in evil-mode
@@ -1997,7 +2000,7 @@ Multiple cursors!
         (evil-mc-undo-all-cursors)
         (evil-mc-resume-cursors)
         t))
-    (add-hook '+evil-esc-hook #'+evil|escape-multiple-cursors))
+    (add-hook 'bmacs-escape-hook #'+evil|escape-multiple-cursors))
 #+END_SRC
 
 **** evil-snipe
@@ -2153,7 +2156,94 @@ Everyone knows iedit!
         :n [escape] 'iedit-quit))
 #+END_SRC
 
-*** yasnippet?
+*** yasnippet
+
+**** functions
+
+#+BEGIN_SRC emacs-lisp
+(defun +snippets/goto-start-of-field ()
+  "Go to the beginning of the current field."
+  (interactive)
+  (let* ((snippet (car (yas-active-snippets)))
+         (position (yas--field-start (yas--snippet-active-field snippet))))
+    (if (= (point) position)
+        (move-beginning-of-line 1)
+      (goto-char position))))
+
+(defun +snippets/goto-end-of-field ()
+  "Go to the end of the current field."
+  (interactive)
+  (let* ((snippet (car (yas-active-snippets)))
+         (position (yas--field-end (yas--snippet-active-field snippet))))
+    (if (= (point) position)
+        (move-end-of-line 1)
+      (goto-char position))))
+
+(defun +snippets/delete-backward-char (&optional field)
+  "Prevents Yas from interfering with backspace deletion."
+  (interactive)
+  (let ((field (or field (and yas--active-field-overlay
+                              (overlay-buffer yas--active-field-overlay)
+                              (overlay-get yas--active-field-overlay 'yas--field)))))
+    (cond ((eq (point) (marker-position (yas--field-start field))) nil)
+          (t (call-interactively #'delete-backward-char)))))
+
+(defun +snippets/delete-forward-char-or-field (&optional field)
+  "Delete forward, or skip the current field if it's empty. This is to prevent
+buggy behavior when <delete> is pressed in an empty field."
+  (interactive)
+  (let ((field (or field (and yas--active-field-overlay
+                              (overlay-buffer yas--active-field-overlay)
+                              (overlay-get yas--active-field-overlay 'yas--field)))))
+    (cond ((and field
+                (not (yas--field-modified-p field))
+                (eq (point) (marker-position (yas--field-start field))))
+           (yas--skip-and-clear field)
+           (yas-next-field 1))
+          ((eq (point) (marker-position (yas--field-end field))) nil)
+          (t (delete-char 1)))))
+
+(defun +snippets/delete-to-start-of-field (&optional field)
+  "Delete to start-of-field."
+  (interactive)
+  (let* ((field (or field (and yas--active-field-overlay
+                               (overlay-buffer yas--active-field-overlay)
+                               (overlay-get yas--active-field-overlay 'yas--field))))
+         (sof (marker-position (yas--field-start field))))
+    (when (and field (> (point) sof))
+      (delete-region sof (point)))))
+#+END_SRC
+
+**** config
+
+#+BEGIN_SRC emacs-lisp
+(use-package yasnippet
+  :commands (yas-minor-mode yas-minor-mode-on yas-expand yas-expand-snippet
+             yas-lookup-snippet yas-insert-snippet yas-new-snippet
+             yas-visit-snippet-file snippet-mode)
+  :config
+  ;; Use ivy to complete yas snippets
+  (defun +ivy-yas-prompt (prompt choices &optional display-fn)
+    (yas-completing-prompt prompt choices display-fn #'ivy-completing-read))
+  (push #'+ivy-yas-prompt yas-prompt-functions)
+
+  ;; enable yas on desired modes
+  (add-hook! (text-mode prog-mode snippet-mode org-mode)
+    #'yas-minor-mode-on)
+
+  (setq yas-also-auto-indent-first-line t
+        yas-prompt-functions (delq 'yas-dropdown-prompt yas-prompt-functions))
+
+  ;; Exit snippets on ESC from normal mode
+  (add-hook 'bmacs-escape-hook #'yas-abort-snippet))
+#+END_SRC
+
+*** yasnippet-snippets
+
+#+BEGIN_SRC emacs-lisp
+(use-package yasnippet-snippets
+  :after yasnippet)
+#+END_SRC
 
 *** flycheck
 Check syntax!
@@ -2165,15 +2255,7 @@ Check syntax!
   :commands (flycheck-mode flycheck-list-errors flycheck-buffer)
   :config
   ;; Emacs feels snappier without checks on idle/change
-  (setq flycheck-check-syntax-automatically '(save mode-enabled))
-
-  (after! evil
-    ;; Flycheck buffer on ESC in normal mode.
-    (defun +syntax-checkers|flycheck-buffer ()
-      (when flycheck-mode
-        (ignore-errors (flycheck-buffer))
-        nil))
-    (add-hook '+evil-esc-hook #'+syntax-checkers|flycheck-buffer t)))
+  (setq flycheck-check-syntax-automatically '(save mode-enabled)))
 
 
 (use-package flycheck-pos-tip
@@ -2193,7 +2275,8 @@ Check syntax!
   :commands (magit-status magit-blame magit-log-buffer-file magit-file-popup magit-log-all)
   :config
   (map! :map magit-mode-map
-        "SPC" nil))
+        "SPC" nil)
+  (setq magit-completing-read-function #'ivy-completing-read))
 #+END_SRC
 
 *** gitconfig-mode
@@ -2230,10 +2313,10 @@ Check syntax!
   (after! evil
     (defun +version-control|update-git-gutter ()
       "Refresh git-gutter on ESC. Return nil to prevent shadowing other
-`+evil-esc-hook' hooks."
+`bmacs-escape-hook hooks."
       (when git-gutter-mode
         (ignore (git-gutter))))
-    (add-hook '+evil-esc-hook #'+version-control|update-git-gutter t))
+    (add-hook 'bmacs-escape-hook #'+version-control|update-git-gutter t))
 
     ;; Update git-gutter on focus (in case I was using git externally)
     (add-hook 'focus-in-hook #'git-gutter:update-all-windows))
@@ -2787,7 +2870,7 @@ DEFAULT is non-nil, set the default mode-line for all buffers."
 
   ;; Ensure anzu state is cleared when searches & iedit are done
   (add-hook 'isearch-mode-end-hook #'anzu--reset-status t)
-  (add-hook '+evil-esc-hook #'anzu--reset-status t)
+  (add-hook 'bmacs-escape-hook #'anzu--reset-status t)
   (add-hook 'iedit-mode-end-hook #'anzu--reset-status))
 
 
@@ -4161,7 +4244,7 @@ between the two."
           :ni [C-return]   (λ! (+borg/insert-item 'below))
           :ni [S-C-return] (λ! (+borg/insert-item 'above))
 
-          :ni "M-SPC" #'org-cycle
+          :ni "S-SPC" #'org-cycle
 
           :n  "C-j"   #'org-next-visible-heading
           :n  "C-k"   #'org-previous-visible-heading
@@ -4249,7 +4332,7 @@ between the two."
     (when (derived-mode-p 'org-mode)
       (org-remove-occur-highlights)
       t))
-  (add-hook '+evil-esc-hook #'+borg|remove-occur-highlights))
+  (add-hook 'bmacs-escape-hook #'+borg|remove-occur-highlights))
 
 (+borg/org-load-hook #'+borg|init)
 (add-hook 'org-mode-hook #'+borg|hook)
@@ -5190,7 +5273,7 @@ TODO - I really have no idea
   (when (bound-and-true-p winner-mode)
     (push neo-buffer-name winner-boring-buffers))
 
-  (add-hook '+evil-esc-hook #'neotree-hide)
+  (add-hook 'bmacs-escape-hook #'neotree-hide)
 
   (defvar +neotree/neotree-opening-file nil)
   (defvar +neotree/neotree-entering-dired nil)
@@ -7249,6 +7332,8 @@ session)."
  "M-0"    (λ! (text-scale-set 0))
  "M-="    #'text-scale-increase
  "M--"    #'text-scale-decrease
+ ;; Evil Escape
+ [escape] #'bmacs/escape
  ;; Temporary escape into emacs mode
  :e [C-escape] #'evil-normal-state
  :n [C-escape] #'evil-emacs-state
