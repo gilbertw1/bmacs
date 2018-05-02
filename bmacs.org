@@ -1619,7 +1619,7 @@ Making everything all ivy-ed up.
   "Highlight entries that have been visited. This is the opposite of
 `counsel-projectile-find-file'."
     (cond ((get-file-buffer (projectile-expand-root str))
-           (propertize str 'face '(:weight ultra-bold :slant italic)))
+           (propertize str 'face '(:weight ultra-bold :slant italic :foreground "#51afef")))
           (t str)))
   (ivy-set-display-transformer #'counsel-projectile-find-file #'+ivy-projectile-find-file-transformer)
 
@@ -5667,7 +5667,9 @@ The language that runs on the Emacs interpreter
     (add-hook 'emacs-lisp-mode-hook #'+emacs-lisp|init-imenu)
     (add-hook 'emacs-lisp-mode-hook #'+emacs-lisp|init-flycheck)
 
-    ;;
+    ;; Disable auto pair ' in elisp mode
+    (sp-local-pair 'emacs-lisp-mode "'" nil :actions nil)
+
     (defun +emacs-lisp|extra-fontification ()
       "Display lambda as a smybol and fontify doom module functions."
       (font-lock-add-keywords
@@ -7525,6 +7527,13 @@ session)."
        :prefix "h"
        :desc "Copy region as html"         :v "y" #'gdoom/htmlize-region-copy))
 
+   (:desc "editor"
+     :prefix "e"
+     (:desc "snippets"
+       :prefix "s"
+       :desc "Insert snippet"              :n "i" #'yas-insert-snippet
+       :desc "List all snippets"           :n "l" #'yas-describe-tables))
+
    (:desc "code"
      :prefix "c"
      :desc "Build"                         :nv "b" #'+eval/build
@@ -7532,6 +7541,7 @@ session)."
      :desc "Open debugger"                 :nv "R" #'+debug/open
      :desc "Counsel dash"                  :nv "d" #'counsel-dash
      :desc "Dash install docset"           :nv "i" #'counsel-dash-install-docset))
+
 
  ;; Works when I accidentally use tmux bindings
  (:desc "tmux emulation"
