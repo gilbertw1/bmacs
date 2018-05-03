@@ -177,7 +177,6 @@
     - [[#update-faces][Update Faces]]
     - [[#mardown-open-comamnd][Mardown Open Comamnd]]
     - [[#fix-org-popups][Fix Org Popups]]
-  - [[#todos-01][Todos]]
 
 ** About this file
 
@@ -261,7 +260,7 @@ different types of files.
 
 (defvar bmacs-escape-hook nil
   "A hook run after C-g is pressed (or ESC in normal mode, for evil users). Both
-trigger `doom/escape'.
+trigger `bmacs/escape'.
 
 If any hook returns non-nil, all hooks after it are ignored.")
 
@@ -2014,8 +2013,7 @@ I only really use this for the extended s/S/f/F behavior
   (setq evil-snipe-smart-case t
         evil-snipe-scope 'visible
         evil-snipe-repeat-scope 'buffer
-        evil-snipe-char-fold t
-        evil-snipe-disabled-modes '(magit-mode elfeed-show-mode elfeed-search-mode))
+        evil-snipe-char-fold t)
   (add-hook 'bmacs-post-init-hook #'evil-snipe-override-mode))
 #+END_SRC
 
@@ -2282,7 +2280,6 @@ Check syntax!
 
 #+BEGIN_SRC emacs-lisp
 (use-package magit
-  :commands (magit-status magit-blame magit-log-buffer-file magit-file-popup magit-log-all)
   :config
   (map! :map magit-mode-map
         "SPC" nil)
@@ -4116,7 +4113,7 @@ It's org-mode ya'll
   :defer t)
 
 ;; Ensure ELPA org is prioritized above built-in org.
-(setq load-path (remove-if (lambda (x) (string-match-p "org$" x)) load-path))
+(setq load-path (seq-filter (lambda (x) (not (string-match-p "org$" x))) load-path))
 
 ;; Custom variables
 (defvar +borg-dir (expand-file-name "~/org/")
@@ -4810,7 +4807,7 @@ Configuration
                 :n "m" #'mu4e-view-mark-for-move))
 
             (:map mu4e~update-mail-mode-map
-              :n "q" #'mu4e-interrupt-update-mail))))
+              :n "q" #'mu4e-kill-update-mail))))
 
 
   (use-package mu4e-maildirs-extension
@@ -6843,7 +6840,7 @@ _SPC_ cancel	_o_nly this   	_d_elete			_=_ Balance
           (add-hook 'ace-window-end-once-hook
                     'hydra-window/body)))
    ("o" delete-other-windows)
-   ("m" ace-maximize-window)
+   ("m" ace-delete-other-windows)
    ("=" balance-windows)
    ("z" (progn
           (winner-undo)
@@ -7662,13 +7659,6 @@ session)."
  ;; evil-exchange
  :n  "gx" #'evil-exchange
 
- ;; evil-snipe
- (:after evil-snipe
-   ;; Binding to switch to evil-easymotion/avy after a snipe
-   (:map evil-snipe-parent-transient-map
-     "C-;" (λ! (require 'evil-easymotion)
-               (call-interactively +evil--snipe-repeat-fn))))
-
  ;; avy goto char
  :n "s"   #'avy-goto-char-2
 
@@ -7997,8 +7987,3 @@ Set the various indentations
   (defun org-switch-to-buffer-other-window (&rest args)
     (apply #'switch-to-buffer-other-window args)))
 #+END_SRC
-
-** Todos [0/1]
-
-- [ ] Fix evil-mc incorrect cursor position
-      When using 'C-S-j' sometimes the cursor jumps around
