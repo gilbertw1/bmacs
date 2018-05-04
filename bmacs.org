@@ -66,7 +66,7 @@
     - [[#undo-tree][undo-tree]]
     - [[#expand-region][expand-region]]
     - [[#clean-aindent-mode][clean-aindent-mode]]
-    - [[#iedit---todo-experiment-removing-this][iedit - TODO: experiment removing this]]
+    - [[#iedit][iedit]]
     - [[#yasnippet][yasnippet]]
     - [[#yasnippet-snippets][yasnippet-snippets]]
     - [[#auto-yasnippet][auto-yasnippet]]
@@ -87,7 +87,7 @@
     - [[#doom-themes][doom-themes]]
     - [[#doom-dashboard][doom-dashboard]]
     - [[#doom-modeline][doom-modeline]]
-    - [[#doom-quit][doom-quit]]
+    - [[#doom-quit-quit-prompt-with-messages-begin_src-emacs-lisp-defvar-doom-quit-messages--from-doom-1-please-dont-leave-theres-more-demons-to-toast-lets-beat-it----this-is-turning-into-a-bloodbath-i-wouldnt-leave-if-i-were-you-dos-is-much-worse-dont-leave-yet----theres-a-demon-around-that-corner-ya-know-next-time-you-come-in-here-im-gonna-toast-ya-go-ahead-and-leave-see-if-i-care-are-you-sure-you-want-to-quit-this-great-editor--custom-setq-nothing-t-everything-permitted-emacs-will-remember-that-emacs-emacs-never-changes-hey-hey-m-x-listen-im-the-man-whos-going-to-burn-your-house-down-with-lemons-its-not-like-ill-miss-you-or-anything-b-baka-okay-look-weve-both-said-a-lot-of-things-youre-going-to-regret-wake-up-mr-stallman-wake-up-and-smell-the-ashes-you-are-not-prepared-a-list-of-quit-messages-picked-randomly-by-doom-quit-taken-from-httpdoomwikiacomwikiquit_messages-and-elsewhere-defun-doomquit-rest-_-doom-quit-p-format-s--quit-nth-random-length-doom-quit-messages-doom-quit-messages--remove-hook-kill-emacs-query-functions-doom-quit-p-add-hook-kill-emacs-query-functions-doomquit-end_src][doom-quit Quit prompt with messages #+BEGIN_SRC emacs-lisp (defvar +doom-quit-messages '(;; from Doom 1 "Please don't leave, there's more demons to toast!" "Let's beat it -- This is turning into a bloodbath!" "I wouldn't leave if I were you. DOS is much worse." "Don't leave yet -- There's a demon around that corner!" "Ya know, next time you come in here I'm gonna toast ya." "Go ahead and leave. See if I care." "Are you sure you want to quit this great editor?" ;; Custom "(setq nothing t everything 'permitted)" "Emacs will remember that." "Emacs, Emacs never changes." "Hey! Hey, M-x listen!" "I'm the man who's going to burn your house down! With lemons!" "It's not like I'll miss you or anything, b-baka!" "Okay, look. We've both said a lot of things you're going to regret..." "Wake up, Mr. Stallman. Wake up and smell the ashes." "You are *not* prepared!") "A list of quit messages, picked randomly by `+doom-quit'. Taken from http://doom.wikia.com/wiki/Quit_messages and elsewhere.") (defun +doom|quit (&rest _) (doom-quit-p (format "%s  Quit?" (nth (random (length +doom-quit-messages)) +doom-quit-messages)))) ;; (remove-hook 'kill-emacs-query-functions #'doom-quit-p) (add-hook 'kill-emacs-query-functions #'+doom|quit) #+END_SRC]]
     - [[#evil-goggles][evil-goggles]]
     - [[#hl-todo][hl-todo]]
     - [[#nav-flash][nav-flash]]
@@ -1310,73 +1310,9 @@ They power and the glory! Generic complete anything frontend
 
 Like vim but better.
 
+**** Functions
+
 #+BEGIN_SRC emacs-lisp
-(use-package evil
-  :demand t
-  :init
-  (setq evil-want-C-u-scroll t                  ; C-u scrolls up
-        evil-want-visual-char-semi-exclusive t  ; don't include new line in visual selection
-        evil-want-Y-yank-to-eol t               ; 'Y' yanks to end of line
-        evil-echo-state t                       ; signal current state in echo area
-        evil-indent-convert-tabs t              ; automatically convert tabs or spaces to desired type
-        evil-magic t                            ; use vim patterns in search
-        evil-ex-search-vim-style-regexp t       ; support vim style backslash codes
-        evil-ex-substitute-global t             ; global substitute patterns
-        evil-ex-visual-char-range t             ; column range for ex commands
-        evil-mode-line-format 'nil              ; don't have evil show modeline tag
-        evil-symbol-word-search t               ; more vim-like behavior
-        shift-select-mode nil)                  ; don't activate mark on shift-click
-
-  :config
-  ;; use evil-search for searching
-  (evil-select-search-module 'evil-search-module 'evil-search)
-
-  ;; Set cursor colors later, once theme is loaded
-  (defun +evil*init-cursors (&rest _)
-    (setq evil-default-cursor (face-background 'cursor nil t)
-          evil-normal-state-cursor 'box
-          evil-emacs-state-cursor  `(,(face-foreground 'warning) box)
-          evil-insert-state-cursor 'bar
-          evil-visual-state-cursor 'hollow))
-  (advice-add #'load-theme :after #'+evil*init-cursors)
-
-  ;; default modes
-  (dolist (mode '(tabulated-list-mode view-mode comint-mode term-mode calendar-mode Man-mode grep-mode))
-    (evil-set-initial-state mode 'emacs))
-  (dolist (mode '(help-mode debugger-mode))
-    (evil-set-initial-state mode 'normal))
-
-  (defun +evil|disable-highlights ()
-    "Disable ex search buffer highlights."
-    (when (evil-ex-hl-active-p 'evil-ex-search)
-      (evil-ex-nohighlight)
-      t))
-  (add-hook 'bmacs-escape-hook #'+evil|disable-highlights)
-
-
-  ;; make `try-expand-dabbrev' from `hippie-expand' work in minibuffer
-  ;; @see `he-dabbrev-beg', so we need re-define syntax for '/'
-  (defun minibuffer-inactive-mode-hook-setup ()
-    (set-syntax-table (let* ((table (make-syntax-table)))
-                        (modify-syntax-entry ?/ "." table)
-                        table)))
-  (add-hook 'minibuffer-inactive-mode-hook #'minibuffer-inactive-mode-hook-setup)
-
-  ;; --- evil hacks -------------------------
-
-  ;; Make ESC (from normal mode) the universal escaper. See `bmacs-escape-hook'.
-  (advice-add #'evil-force-normal-state :after #'bmacs/escape)
-
-  (defun +evil*restore-normal-state-on-windmove (orig-fn &rest args)
-    "If in anything but normal or motion mode when moving to another window,
-restore normal mode. This prevents insert state from bleeding into other modes
-across windows."
-    (unless (memq evil-state '(normal motion emacs))
-      (evil-normal-state +1))
-    (apply orig-fn args))
-  (advice-add #'windmove-do-window-select :around #'+evil*restore-normal-state-on-windmove)
-
-
   (defvar +evil--flag nil)
 
   (defun +evil--ex-match-init (name &optional face update-hook)
@@ -1428,11 +1364,6 @@ across windows."
         (+evil--ex-match-init hl-name)
         (+evil--ex-buffer-match arg hl-name nil (point-min) (point-max)))))
 
-  ;; These arg types will highlight matches in the current buffer
-  (evil-ex-define-argument-type buffer-match :runner +evil-ex-buffer-match)
-  (evil-ex-define-argument-type global-match :runner +evil-ex-global-match)
-
-
   (defun +evil-ex-global-delim-match (flag &optional arg)
     (let ((hl-name 'evil-ex-global-delim-match)
           (+evil--flag flag))
@@ -1440,6 +1371,85 @@ across windows."
         (+evil--ex-match-init hl-name)
         (let ((result (car-safe (evil-delimited-arguments arg 2))))
           (+evil--ex-buffer-match result hl-name nil (point-min) (point-max))))))
+
+(defun +evil/visual-indent ()
+  (interactive)
+  (evil-shift-right (region-beginning) (region-end))
+  (evil-normal-state)
+  (evil-visual-restore))
+
+(defun +evil/visual-dedent ()
+  (interactive)
+  (evil-shift-left (region-beginning) (region-end))
+  (evil-normal-state)
+  (evil-visual-restore))
+#+END_SRC
+
+**** Configuration
+
+#+BEGIN_SRC emacs-lisp
+(use-package evil
+  :demand t
+  :init
+  (setq evil-want-C-u-scroll t                  ; C-u scrolls up
+        evil-want-visual-char-semi-exclusive t  ; don't include new line in visual selection
+        evil-want-Y-yank-to-eol t               ; 'Y' yanks to end of line
+        evil-echo-state t                       ; signal current state in echo area
+        evil-indent-convert-tabs t              ; automatically convert tabs or spaces to desired type
+        evil-magic t                            ; use vim patterns in search
+        evil-ex-search-vim-style-regexp t       ; support vim style backslash codes
+        evil-ex-substitute-global t             ; global substitute patterns
+        evil-ex-visual-char-range t             ; column range for ex commands
+        evil-mode-line-format 'nil              ; don't have evil show modeline tag
+        evil-symbol-word-search t               ; more vim-like behavior
+        shift-select-mode nil)                  ; don't activate mark on shift-click
+
+  :config
+  ;; use evil-search for searching
+  (evil-select-search-module 'evil-search-module 'evil-search)
+
+  ;; Set cursor colors later, once theme is loaded
+  (advice-add #'load-theme :after #'+evil*init-cursors)
+
+  ;; default modes
+  (dolist (mode '(tabulated-list-mode view-mode comint-mode term-mode calendar-mode Man-mode grep-mode))
+    (evil-set-initial-state mode 'emacs))
+  (dolist (mode '(help-mode debugger-mode))
+    (evil-set-initial-state mode 'normal))
+
+  (defun +evil|disable-highlights ()
+    "Disable ex search buffer highlights."
+    (when (evil-ex-hl-active-p 'evil-ex-search)
+      (evil-ex-nohighlight)
+      t))
+  (add-hook 'bmacs-escape-hook #'+evil|disable-highlights)
+
+
+  ;; make `try-expand-dabbrev' from `hippie-expand' work in minibuffer
+  ;; @see `he-dabbrev-beg', so we need re-define syntax for '/'
+  (defun minibuffer-inactive-mode-hook-setup ()
+    (set-syntax-table (let* ((table (make-syntax-table)))
+                        (modify-syntax-entry ?/ "." table)
+                        table)))
+  (add-hook 'minibuffer-inactive-mode-hook #'minibuffer-inactive-mode-hook-setup)
+
+  ;; --- evil hacks -------------------------
+
+  ;; Make ESC (from normal mode) the universal escaper. See `bmacs-escape-hook'.
+  (advice-add #'evil-force-normal-state :after #'bmacs/escape)
+
+  (defun +evil*restore-normal-state-on-windmove (orig-fn &rest args)
+    "If in anything but normal or motion mode when moving to another window,
+restore normal mode. This prevents insert state from bleeding into other modes
+across windows."
+    (unless (memq evil-state '(normal motion emacs))
+      (evil-normal-state +1))
+    (apply orig-fn args))
+  (advice-add #'windmove-do-window-select :around #'+evil*restore-normal-state-on-windmove)
+
+  ;; These arg types will highlight matches in the current buffer
+  (evil-ex-define-argument-type buffer-match :runner +evil-ex-buffer-match)
+  (evil-ex-define-argument-type global-match :runner +evil-ex-global-match)
 
   ;; By default :g[lobal] doesn't highlight matches in the current buffer. I've
   ;; got to write my own argument type and interactive code to get it to do so.
@@ -1450,6 +1460,8 @@ across windows."
 
   (evil-mode))
 #+END_SRC
+
+**** Operators
 
 I like to prevent evil from yanking text to the clipboard in many scenarios.
 
@@ -1556,19 +1568,6 @@ I like to prevent evil from yanking text to the clipboard in many scenarios.
                   (nth 3 evil-last-paste)
                   (nth 4 evil-last-paste)
                   t)))))
-
-(defun +evil/visual-indent ()
-  (interactive)
-  (evil-shift-right (region-beginning) (region-end))
-  (evil-normal-state)
-  (evil-visual-restore))
-
-(defun +evil/visual-dedent ()
-  (interactive)
-  (evil-shift-left (region-beginning) (region-end))
-  (evil-normal-state)
-  (evil-visual-restore))
-
 #+END_SRC
 
 *** recentf
@@ -1595,6 +1594,35 @@ Awesome visual search utility
 *** Counsel
 Making everything all ivy-ed up.
 
+**** Functions
+
+#+BEGIN_SRC emacs-lisp
+;; Find in project using current word or selection
+(defun counsel-projectile-rg-initial (&optional value)
+  "Ivy version of `projectile-rg'."
+  (interactive)
+  (if (projectile-project-p)
+        (counsel-rg value
+                    (projectile-project-root)
+                    nil
+                    (projectile-prepend-project-name "rg"))
+  (user-error "You're not in a project")))
+
+(defun counsel-projectile-rg-region-or-symbol ()
+  "Use `counsel-rg' to search for the selected region or
+ the symbol around point in the current project with git grep."
+  (interactive)
+  (let ((input (if (region-active-p)
+    (buffer-substring-no-properties
+      (region-beginning) (region-end))
+      (thing-at-point 'symbol t))))
+    (if (projectile-project-p)
+      (counsel-projectile-rg-initial input)
+      (counsel-rg input))))
+#+END_SRC
+
+**** Config
+
 #+BEGIN_SRC emacs-lisp
 (use-package counsel-projectile
   :init
@@ -1618,30 +1646,7 @@ Making everything all ivy-ed up.
     (cond ((get-file-buffer (projectile-expand-root str))
            (propertize str 'face '(:weight ultra-bold :slant italic :foreground "#51afef")))
           (t str)))
-  (ivy-set-display-transformer #'counsel-projectile-find-file #'+ivy-projectile-find-file-transformer)
-
-  ;; Find in project using current word or selection
-  (defun counsel-projectile-rg-initial (&optional value)
-    "Ivy version of `projectile-rg'."
-    (interactive)
-    (if (projectile-project-p)
-          (counsel-rg value
-                      (projectile-project-root)
-                      nil
-                      (projectile-prepend-project-name "rg"))
-    (user-error "You're not in a project")))
-
-  (defun counsel-projectile-rg-region-or-symbol ()
-    "Use `counsel-rg' to search for the selected region or
- the symbol around point in the current project with git grep."
-    (interactive)
-    (let ((input (if (region-active-p)
-      (buffer-substring-no-properties
-        (region-beginning) (region-end))
-        (thing-at-point 'symbol t))))
-      (if (projectile-project-p)
-        (counsel-projectile-rg-initial input)
-        (counsel-rg input)))))
+  (ivy-set-display-transformer #'counsel-projectile-find-file #'+ivy-projectile-find-file-transformer))
 
 (use-package counsel
   :demand t
@@ -1818,29 +1823,11 @@ Dictionary based completions in company
 *** persp-mode
 Allows for creation of isolated workspaces
 
+**** Functions
+
 #+BEGIN_SRC emacs-lisp
 (defvar +workspaces-last-persp nil
   "A variable that contains the last accessed perspective")
-
-(use-package persp-mode :demand t
-  :config
-  (setq wg-morph-on nil
-        persp-autokill-buffer-on-remove 'kill-weak
-        persp-nil-name "nil"
-        persp-nil-hidden t
-        persp-auto-save-fname "autosave"
-        persp-auto-resume-time 1
-        persp-auto-save-opt 1
-        persp-save-dir (concat bmacs-etc-dir "workspaces/"))
-
-  (defun +workspaces*track-last-persp (switch-fun &rest args)
-    (let ((before-persp (safe-persp-name (get-current-persp)))
-          (after-persp (apply switch-fun args)))
-      (when (not (string= before-persp after-persp))
-        (setq +workspaces-last-persp before-persp))))
-
-  (advice-add #'persp-switch :around #'+workspaces*track-last-persp)
-  (add-hook 'bmacs-post-init-hook #'(lambda () (persp-mode 1))))
 
 (defun +workspace-exists-p (name)
   "Returns t if NAME is the name of an existing workspace."
@@ -1869,6 +1856,30 @@ Allows for creation of isolated workspaces
                         (persp-switch project)
                         (let ((projectile-completion-system 'ivy))
                           (projectile-switch-project-by-name project))))))
+#+END_SRC
+
+**** Config
+
+#+BEGIN_SRC emacs-lisp
+(use-package persp-mode :demand t
+  :config
+  (setq wg-morph-on nil
+        persp-autokill-buffer-on-remove 'kill-weak
+        persp-nil-name "nil"
+        persp-nil-hidden t
+        persp-auto-save-fname "autosave"
+        persp-auto-resume-time 1
+        persp-auto-save-opt 1
+        persp-save-dir (concat bmacs-etc-dir "workspaces/"))
+
+  (defun +workspaces*track-last-persp (switch-fun &rest args)
+    (let ((before-persp (safe-persp-name (get-current-persp)))
+          (after-persp (apply switch-fun args)))
+      (when (not (string= before-persp after-persp))
+        (setq +workspaces-last-persp before-persp))))
+
+  (advice-add #'persp-switch :around #'+workspaces*track-last-persp)
+  (add-hook 'bmacs-post-init-hook #'(lambda () (persp-mode 1))))
 #+END_SRC
 
 
@@ -2131,7 +2142,7 @@ Auto indentation
   (define-key global-map (kbd "RET") 'newline-and-indent))
 #+END_SRC
 
-*** iedit - TODO: experiment removing this
+*** iedit
 Everyone knows iedit!
 
 #+BEGIN_SRC emacs-lisp
@@ -3457,42 +3468,7 @@ Returns \"\" to not break --no-window-system."
 
 #+END_SRC
 
-*** doom-quit
-Quit prompt with messages
-
-#+BEGIN_SRC emacs-lisp
-(defvar +doom-quit-messages
-  '(;; from Doom 1
-    "Please don't leave, there's more demons to toast!"
-    "Let's beat it -- This is turning into a bloodbath!"
-    "I wouldn't leave if I were you. DOS is much worse."
-    "Don't leave yet -- There's a demon around that corner!"
-    "Ya know, next time you come in here I'm gonna toast ya."
-    "Go ahead and leave. See if I care."
-    "Are you sure you want to quit this great editor?"
-    ;; Custom
-    "(setq nothing t everything 'permitted)"
-    "Emacs will remember that."
-    "Emacs, Emacs never changes."
-    "Hey! Hey, M-x listen!"
-    "I'm the man who's going to burn your house down! With lemons!"
-    "It's not like I'll miss you or anything, b-baka!"
-    "Okay, look. We've both said a lot of things you're going to regret..."
-    "Wake up, Mr. Stallman. Wake up and smell the ashes."
-    "You are *not* prepared!")
-  "A list of quit messages, picked randomly by `+doom-quit'. Taken from
-http://doom.wikia.com/wiki/Quit_messages and elsewhere.")
-
-(defun +doom|quit (&rest _)
-  (doom-quit-p
-   (format "%s  Quit?"
-           (nth (random (length +doom-quit-messages))
-                +doom-quit-messages))))
-
-;;
-(remove-hook 'kill-emacs-query-functions #'doom-quit-p)
-(add-hook 'kill-emacs-query-functions #'+doom|quit)
-#+END_SRC
+*** doom-quit Quit prompt with messages #+BEGIN_SRC emacs-lisp (defvar +doom-quit-messages '(;; from Doom 1 "Please don't leave, there's more demons to toast!" "Let's beat it -- This is turning into a bloodbath!" "I wouldn't leave if I were you. DOS is much worse." "Don't leave yet -- There's a demon around that corner!" "Ya know, next time you come in here I'm gonna toast ya." "Go ahead and leave. See if I care." "Are you sure you want to quit this great editor?" ;; Custom "(setq nothing t everything 'permitted)" "Emacs will remember that." "Emacs, Emacs never changes." "Hey! Hey, M-x listen!" "I'm the man who's going to burn your house down! With lemons!" "It's not like I'll miss you or anything, b-baka!" "Okay, look. We've both said a lot of things you're going to regret..." "Wake up, Mr. Stallman. Wake up and smell the ashes." "You are *not* prepared!") "A list of quit messages, picked randomly by `+doom-quit'. Taken from http://doom.wikia.com/wiki/Quit_messages and elsewhere.") (defun +doom|quit (&rest _) (doom-quit-p (format "%s  Quit?" (nth (random (length +doom-quit-messages)) +doom-quit-messages)))) ;; (remove-hook 'kill-emacs-query-functions #'doom-quit-p) (add-hook 'kill-emacs-query-functions #'+doom|quit) #+END_SRC
 
 *** evil-goggles
 
@@ -3691,8 +3667,7 @@ If we're not using Emacs 26+ we need nlinum to support line numbers.
       (setq nlinum--width
             (length (save-excursion (goto-char (point-max))
                                     (format-mode-line "%l")))))
-    (add-hook 'nlinum-mode-hook #'bmacs|init-nlinum-width)))
-
+    (add-hook 'nlinum-mode-hook #'bmacs|init-nlinum-width))
 
   (use-package nlinum-hl
     :after nlinum
@@ -3708,7 +3683,7 @@ If we're not using Emacs 26+ we need nlinum to support line numbers.
 
     ;; Changing fonts can leave nlinum line numbers in their original size; this
     ;; forces them to resize.
-    (advice-add #'set-frame-font :after #'nlinum-hl-flush-all-windows))
+    (advice-add #'set-frame-font :after #'nlinum-hl-flush-all-windows)))
 #+END_SRC
 
 *** winner-mode
@@ -4778,6 +4753,8 @@ Directories in Emacs
 *** EShell
 A terminal by Emacs for Emacs!
 
+**** Functions
+
 #+BEGIN_SRC emacs-lisp
 (defun +eshell--outside-prompt-p ()
   (< (point) eshell-last-output-end))
@@ -4856,7 +4833,11 @@ A terminal by Emacs for Emacs!
     (if (not (eq branch nil))
         (concat " [" (substring branch 2) "]")
       "")))
+#+END_SRC
 
+**** Config
+
+#+BEGIN_SRC emacs-lisp
 (use-package eshell ; built-in
   :commands eshell-mode
   :init
@@ -4882,38 +4863,6 @@ A terminal by Emacs for Emacs!
     ;; delegates these commands to a term buffer.
     (nconc eshell-visual-commands '("tmux" "htop" "bash" "zsh" "fish" "vim" "nvim"))
     (setq eshell-visual-subcommands '(("git" "log" "l" "diff" "show"))))
-
-  (defun +eshell|init-keymap ()
-    "Setup eshell keybindings. This must be done in a hook because eshell-mode
-redefines its keys every time `eshell-mode' is enabled."
-    (map! :map eshell-mode-map
-          :n "i"        #'+eshell/evil-prepend-maybe
-          :n "I"        #'+eshell/evil-prepend
-          :n "a"        #'+eshell/evil-append-maybe
-          :n "A"        #'+eshell/evil-append
-          :n "r"        #'+eshell/evil-replace-maybe
-          :n "R"        #'+eshell/evil-replace-state-maybe
-          :n "c"        #'+eshell/evil-change
-          :n "C"        #'+eshell/evil-change-line
-          :i [tab]      #'eshell-pcomplete
-          :i "SPC"      #'self-insert-command
-          :i "C-u"      #'eshell-kill-input
-          :i "C-a"      #'eshell-bol
-          :i "C-d"      #'+eshell/quit-or-delete-char
-          :i "C-k"      #'kill-line
-          :i "C-p"      #'eshell-previous-input
-          :i "<up>"     #'eshell-previous-input
-          :i "C-n"      #'eshell-next-input
-          :i "<down>"   #'eshell-next-input
-          :m "<return>" #'+eshell/evil-append
-          ;; BMACS - needed to actually send input and use shell
-          :i "<return>" #'eshell-send-input
-          :n [remap evil-window-split]     #'+eshell/split
-          :n [remap evil-window-vsplit]    #'+eshell/vsplit
-          :n [remap evil-record-macro]     #'eshell-life-is-too-much
-          [remap kill-this-buffer] #'eshell-life-is-too-much
-          [remap +workspace/close-window-or-workspace] #'eshell-life-is-too-much))
-  (add-hook 'eshell-mode-hook #'+eshell|init-keymap)
 
   ;; Aliases
   (setq eshell-command-aliases-list
@@ -4941,6 +4890,8 @@ TODO - I really have no idea
 #+END_SRC
 
 *** NeoTree
+
+**** Functions
 
 #+BEGIN_SRC emacs-lisp
 (defun +neotree/toggle ()
@@ -5008,7 +4959,11 @@ TODO - I really have no idea
              (neo-point-auto-indent)))
           (t
            (call-interactively #'neotree-enter)))))
+#+END_SRC
 
+**** Config
+
+#+BEGIN_SRC emacs-lisp
 (use-package neotree
   :commands (neotree-show
              neotree-hide
@@ -7421,6 +7376,35 @@ session)."
    (:map eldoc-in-minibuffer-mode-map
      "C-n" #'next-history-element
      "C-p" #'previous-history-element))
+
+(:after eshell
+  (:map eshell-mode-map
+    :n "i"        #'+eshell/evil-prepend-maybe
+    :n "I"        #'+eshell/evil-prepend
+    :n "a"        #'+eshell/evil-append-maybe
+    :n "A"        #'+eshell/evil-append
+    :n "r"        #'+eshell/evil-replace-maybe
+    :n "R"        #'+eshell/evil-replace-state-maybe
+    :n "c"        #'+eshell/evil-change
+    :n "C"        #'+eshell/evil-change-line
+    :i [tab]      #'eshell-pcomplete
+    :i "SPC"      #'self-insert-command
+    :i "C-u"      #'eshell-kill-input
+    :i "C-a"      #'eshell-bol
+    :i "C-d"      #'+eshell/quit-or-delete-char
+    :i "C-k"      #'kill-line
+    :i "C-p"      #'eshell-previous-input
+    :i "<up>"     #'eshell-previous-input
+    :i "C-n"      #'eshell-next-input
+    :i "<down>"   #'eshell-next-input
+    :m "<return>" #'+eshell/evil-append
+    ;; BMACS - needed to actually send input and use shell
+    :i "<return>" #'eshell-send-input
+    :n [remap evil-window-split]     #'+eshell/split
+    :n [remap evil-window-vsplit]    #'+eshell/vsplit
+    :n [remap evil-record-macro]     #'eshell-life-is-too-much
+    [remap kill-this-buffer] #'eshell-life-is-too-much
+    [remap +workspace/close-window-or-workspace] #'eshell-life-is-too-much))
 
  (:after flycheck
    (:map flycheck-error-list-mode-map
