@@ -3857,17 +3857,6 @@ It's org-mode ya'll
   (interactive)
   (find-file +borg-organizer))
 
-(define-minor-mode +org-pretty-mode
-  "TODO"
-  :init-value nil
-  :lighter " *"
-  :group 'evil-org
-  (setq org-hide-emphasis-markers +org-pretty-mode)
-  (org-toggle-pretty-entities)
-  (org-with-silent-modifications
-   ;; In case the above un-align tables
-   (org-table-map-tables 'org-table-align t)))
-
 (defun +borg|realign-table-maybe ()
   "Auto-align table under cursor and re-calculate formulas."
   (when (org-at-table-p)
@@ -4143,10 +4132,7 @@ It's org-mode ya'll
   (setq-local evil-auto-indent nil)
 
   ;; show-paren-mode causes problems for org-indent-mode, so disable it
-  (set (make-local-variable 'show-paren-mode) nil)
-  (defun +org-sp-point-in-checkbox-p (_id action _context)
-    (when (eq action 'insert)
-      (sp--looking-at-p "\\s-*]"))))
+  (set (make-local-variable 'show-paren-mode) nil))
 
 (defun +borg|init ()
   "Run once, when org is first loaded."
@@ -4158,7 +4144,6 @@ It's org-mode ya'll
     :group 'evil-org)
 
   (+borg-init-ui)
-  (+borg-init-keybinds)
   (+borg-hacks))
 
 ;;
@@ -4174,9 +4159,7 @@ It's org-mode ya'll
    org-cycle-separator-lines 1
    org-entities-user '(("flat"  "\\flat" nil "" "" "266D" "♭") ("sharp" "\\sharp" nil "" "" "266F" "♯"))
    org-ellipsis "  "
-                                        ;org-fontify-done-headline t
    org-fontify-quote-and-verse-blocks t
-                                        ;org-fontify-whole-heading-line t
    org-footnote-auto-label 'plain
    org-hidden-keywords nil
    org-hide-emphasis-markers nil
@@ -4209,105 +4192,6 @@ FUN function callback"
   (end-of-line)
   (funcall fun)
   (evil-append nil))
-
-(defun +borg-init-keybinds ()
-  "Sets up org-mode and evil keybindings. Tries to fix the idiosyncrasies
-between the two."
-  (map! (:map org-mode-map
-          "RET" #'org-return-indent
-          "C-j" nil
-          "C-k" nil)
-
-        (:map +org-evil-mode-map
-          :n "RET" #'+borg/dwim-at-point
-          :i "RET" #'evil-ret
-          ;; Navigate table cells
-          :i  "M-l"   #'+borg/table-next-field
-          :i  "M-h"   #'+borg/table-previous-field
-          :i  "M-k"   #'+borg/table-previous-row
-          :i  "M-j"   #'+borg/table-next-row
-
-          :i  [tab]     #'+borg/indent-or-next-field-or-yas-expand
-          :i  [backtab] #'+borg/dedent-or-prev-field
-
-          :nv "j"   #'evil-next-visual-line
-          :nv "k"   #'evil-previous-visual-line
-
-          :ni [M-return]   (λ! (+borg/insert-item 'below))
-          :ni [S-M-return] (λ! (+borg/insert-item 'above))
-          :ni [C-return]   (λ! (+borg/insert-item 'below))
-          :ni [S-C-return] (λ! (+borg/insert-item 'above))
-
-          :ni "S-SPC" #'org-cycle
-
-          :n  "C-j"   #'org-next-visible-heading
-          :n  "C-k"   #'org-previous-visible-heading
-          :n  "C-S-j"     #'org-forward-heading-same-level
-          :n  "C-S-k"     #'org-backward-heading-same-level
-
-          ;; Evil-org
-          :niv "M-h" #'org-metaleft
-          :niv "M-l" #'org-metaright
-          :niv "M-k" #'org-metaup
-          :niv "M-j" #'org-metadown
-          :niv "M-L" #'org-shiftmetaright
-          :niv "M-H" #'org-shiftmetaleft
-          :niv "M-K" #'org-shiftmetaup
-          :niv "M-J" #'org-shiftmetadown
-          :niv "M-o" '(lambda () (interactive)
-                        (evil-org-eol-call
-                         '(lambda()
-                            (org-insert-heading)
-                            (org-metaright))))
-          :niv "C-t" '(lambda () (interactive)
-                        (evil-org-eol-call
-                         '(lambda()
-                            (org-insert-todo-heading nil)
-                            (org-metaright))))
-          :niv "M-t" '(lambda () (interactive)
-                        (evil-org-eol-call
-                         '(lambda()
-                            (org-insert-todo-heading nil)
-                            (org-metaright))))
-
-          (:localleader
-            :n  "RET" #'org-archive-subtree
-            :n  "SPC" #'+borg/toggle-checkbox
-            :n  "/"   #'org-sparse-tree
-            :n  "="   #'org-align-all-tags
-            :n  "?"   #'org-tags-view
-            :n  "a"   #'org-agenda
-            :n  "d"   #'org-time-stamp
-            :n  "D"   #'org-deadline
-            :n  "e"   #'org-edit-special
-            :n  "E"   #'+borg/edit-special-same-window
-            :n  "i"   (lambda () (if (and (boundp 'iimage-mode) iimage-mode) (iimage-mode -1) (iimage-mode +1)))
-            :n  "n"   (lambda () (if (buffer-narrowed-p) (widen) (org-narrow-to-subtree)))
-            :n  "r"   #'org-refile
-            :n  "R"   (lambda () (org-metaleft) (org-archive-to-archive-sibling)) ; archive to parent sibling
-            :n  "s"   #'org-schedule
-            :n  "t"   #'counsel-org-tag
-            :v  "t"   (lambda () (evil-ex-normal evil-visual-beginning evil-visual-end "\\t"))
-            :n  "T"   #'org-todo
-            :n  "v"   #'variable-pitch-mode
-            :nv "l"   #'org-insert-link
-            :nv "L"   #'org-store-link
-            :n  "+"   #'org-timestamp-up-day
-            :n  "-"   #'org-timestamp-down-day)
-
-          :n  "<"   #'org-metaleft
-          :n  ">"   #'org-metaright
-          :v  "<"   (lambda () (org-metaleft)  (evil-visual-restore))
-          :v  ">"   (lambda () (org-metaright) (evil-visual-restore))))
-
-  (after! org-agenda
-    (map! :map org-agenda-mode-map
-          :e "<escape>" #'org-agenda-Quit
-          :e "m"   #'org-agenda-month-view
-          :e "C-j" #'org-agenda-next-item
-          :e "C-k" #'org-agenda-previous-item
-          :e "C-n" #'org-agenda-next-item
-          :e "C-p" #'org-agenda-previous-item)))
 
 ;;
 (defun +borg-hacks ()
@@ -4353,35 +4237,15 @@ between the two."
   (org-babel-do-load-languages
    'org-babel-load-languages
    (mapcar (lambda (sym) (cons sym t))
-           '(calc
-             css
-             emacs-lisp
-             haskell
-             js
-             latex
-             ledger
-             lilypond
-             lisp
-             matlab
-             plantuml
-             python
+           '(emacs-lisp
              restclient ; ob-restclient
-             ruby
              rust       ; ob-rust
              shell
-             sqlite
              sql-mode   ; ob-sql-mode
-             translate  ; ob-translate
              )))
 
   ;; I prefer C-c C-c for confirming over the default C-c '
-  (map! :map org-src-mode-map "C-c C-c" #'org-edit-src-exit)
-
-  (defun +org|src-mode-remove-header ()
-    "Remove header-line with keybinding help; I know the keybinds."
-    (when header-line-format
-      (setq header-line-format nil)))
-  (add-hook 'org-src-mode-hook #'+org|src-mode-remove-header))
+  (map! :map org-src-mode-map "C-c C-c" #'org-edit-src-exit))
 
 (+borg/org-load-hook #'+org-babel|init t)
 #+END_SRC
@@ -4456,7 +4320,6 @@ between the two."
       (centered-window-mode arg))
     (window-divider-mode (* arg -1))
     (doom-hide-modeline-mode arg)
-    (+org-pretty-mode arg)
     (cond (org-tree-slide-mode
            (org-indent-mode -1)
            (text-scale-set +org-present-text-scale)
@@ -4584,70 +4447,70 @@ between the two."
 Configuration
 
 #+BEGIN_SRC emacs-lisp
-  (defvar +email-mu4e-mail-path "~/.mail"
-    "The directory path of mu's maildir.")
+(defvar +email-mu4e-mail-path "~/.mail"
+  "The directory path of mu's maildir.")
 
-  (use-package mu4e
-    :ensure nil
-    :commands (mu4e mu4e-compose-new)
-    :config
-    (setq mu4e-maildir +email-mu4e-mail-path
-          mu4e-attachment-dir "~/Downloads"
-          mu4e-user-mail-address-list nil
-          mu4e-update-interval nil
-          mu4e-compose-format-flowed nil ; visual-line-mode + auto-fill upon sending
-          mu4e-view-show-addresses t
-          mu4e-html2text-command 'mu4e-shr2text
-          shr-width 100
-          ;; try to show images
-          mu4e-view-show-images t
-          mu4e-view-image-max-width 800
-          ;; don't save message to Sent Messages, Gmail/IMAP takes care of this
-          mu4e-sent-messages-behavior 'sent
-          ;; for mbsync
-          mu4e-change-filenames-when-moving t
-          ;; allow for updating mail using 'U' in the main view:
-          mu4e-get-mail-command "mbsync-update-fast"
-          ;; configuration for sending mail
-          message-send-mail-function #'smtpmail-send-it
-          smtpmail-stream-type 'ssl
-          ;; start with the first (default) context;
-          mu4e-context-policy 'pick-first
-          ;; compose with the current context, or ask
-          mu4e-compose-context-policy 'ask-if-none
-          ;; use helm/ivy
-          mu4e-completing-read-function #'ivy-completing-read
-          ;; close message after sending it
-          message-kill-buffer-on-exit t
-          ;; no need to ask
-          mu4e-confirm-quit nil
-          ;; remove 'lists' column
-          mu4e-headers-fields
-          '((:account . 12)
-            (:human-date . 12)
-            (:flags . 4)
-            (:from . 25)
-            (:subject))
-          mu4e-bookmarks `(("maildir:/fastmail/INBOX OR maildir:/gmail/INBOX OR maildir:/stream/INBOX" "Inbox" ?i)
-                           ("maildir:/fastmail/Drafts OR maildir:/gmail/[Gmail]/.Drafts OR maildir:/stream/[Gmail]/.Drafts" "Drafts" ?d)
-                           ("flag:unread AND maildir:/fastmail/INBOX OR maildir:/gmail/INBOX OR maildir:/stream/INBOX" "Unread messages" ?u)
-                           ("flag:flagged" "Starred messages" ?s)
-                           ("date:today..now" "Today's messages" ?t)
-                           ("date:7d..now" "Last 7 days" ?w)
-                           ("mime:image/*" "Messages with images" ?p)))
+(use-package mu4e
+  :ensure nil
+  :commands (mu4e mu4e-compose-new)
+  :config
+  (setq mu4e-maildir +email-mu4e-mail-path
+        mu4e-attachment-dir "~/Downloads"
+        mu4e-user-mail-address-list nil
+        mu4e-update-interval nil
+        mu4e-compose-format-flowed nil ; visual-line-mode + auto-fill upon sending
+        mu4e-view-show-addresses t
+        mu4e-html2text-command 'mu4e-shr2text
+        shr-width 100
+        ;; try to show images
+        mu4e-view-show-images t
+        mu4e-view-image-max-width 800
+        ;; don't save message to Sent Messages, Gmail/IMAP takes care of this
+        mu4e-sent-messages-behavior 'sent
+        ;; for mbsync
+        mu4e-change-filenames-when-moving t
+        ;; allow for updating mail using 'U' in the main view:
+        mu4e-get-mail-command "mbsync-update-fast"
+        ;; configuration for sending mail
+        message-send-mail-function #'smtpmail-send-it
+        smtpmail-stream-type 'ssl
+        ;; start with the first (default) context;
+        mu4e-context-policy 'pick-first
+        ;; compose with the current context, or ask
+        mu4e-compose-context-policy 'ask-if-none
+        ;; use helm/ivy
+        mu4e-completing-read-function #'ivy-completing-read
+        ;; close message after sending it
+        message-kill-buffer-on-exit t
+        ;; no need to ask
+        mu4e-confirm-quit nil
+        ;; remove 'lists' column
+        mu4e-headers-fields
+        '((:account . 12)
+          (:human-date . 12)
+          (:flags . 4)
+          (:from . 25)
+          (:subject))
+        mu4e-bookmarks `(("maildir:/fastmail/INBOX OR maildir:/gmail/INBOX OR maildir:/stream/INBOX" "Inbox" ?i)
+                         ("maildir:/fastmail/Drafts OR maildir:/gmail/[Gmail]/.Drafts OR maildir:/stream/[Gmail]/.Drafts" "Drafts" ?d)
+                         ("flag:unread AND maildir:/fastmail/INBOX OR maildir:/gmail/INBOX OR maildir:/stream/INBOX" "Unread messages" ?u)
+                         ("flag:flagged" "Starred messages" ?s)
+                         ("date:today..now" "Today's messages" ?t)
+                         ("date:7d..now" "Last 7 days" ?w)
+                         ("mime:image/*" "Messages with images" ?p)))
 
-    (add-to-list 'mu4e-view-actions '("ViewInBrowser" . mu4e-action-view-in-browser) t)
+  (add-to-list 'mu4e-view-actions '("ViewInBrowser" . mu4e-action-view-in-browser) t)
 
-    ;; Add a column to display what email account the email belongs to.
-    (add-to-list 'mu4e-header-info-custom
-                 '(:account
-                   :name "Account"
-                   :shortname "Account"
-                   :help "Which account this email belongs to"
-                   :function
-                   (lambda (msg)
-                     (let ((maildir (mu4e-message-field msg :maildir)))
-                       (format "%s" (substring maildir 1 (string-match-p "/" maildir 1)))))))
+  ;; Add a column to display what email account the email belongs to.
+  (add-to-list 'mu4e-header-info-custom
+               '(:account
+                 :name "Account"
+                 :shortname "Account"
+                 :help "Which account this email belongs to"
+                 :function
+                 (lambda (msg)
+                   (let ((maildir (mu4e-message-field msg :maildir)))
+                     (format "%s" (substring maildir 1 (string-match-p "/" maildir 1)))))))
 
 
 
@@ -4677,129 +4540,46 @@ Configuration
                             (true (mu4e~proc-remove docid))))))
         mu4e-marks)
 
-    ;; Refresh the current view after marks are executed
-    (defun +email*refresh (&rest _) (mu4e-headers-rerun-search))
-    (advice-add #'mu4e-mark-execute-all :after #'+email*refresh)
+  ;; Refresh the current view after marks are executed
+  (defun +email*refresh (&rest _) (mu4e-headers-rerun-search))
+  (advice-add #'mu4e-mark-execute-all :after #'+email*refresh)
 
-    (add-hook 'mu4e-compose-mode-hook (lambda ()
-                                        (setq-local fill-column 120)
-                                        (auto-fill-mode -1)
-                                        (visual-line-mode)
-                                        (visual-fill-column-mode)))
-
-  (add-hook 'mu4e-view-mode-hook (lambda ()
+  (add-hook 'mu4e-compose-mode-hook (lambda ()
                                       (setq-local fill-column 120)
+                                      (auto-fill-mode -1)
                                       (visual-line-mode)
                                       (visual-fill-column-mode)))
 
-    ; (when (featurep! :feature spellcheck) TODO
-    ;   (add-hook 'mu4e-compose-mode-hook #'flyspell-mode))
+  (add-hook 'mu4e-view-mode-hook (lambda ()
+                                   (setq-local fill-column 120)
+                                   (visual-line-mode)
+                                   (visual-fill-column-mode)))
 
-    ;; Wrap text in messages
-    (add-hook! 'mu4e-view-mode-hook
-      (setq-local truncate-lines nil))
+                                        ; (when (featurep! :feature spellcheck) TODO
+                                        ;   (add-hook 'mu4e-compose-mode-hook #'flyspell-mode))
 
-    (when (fboundp 'imagemagick-register-types)
-      (imagemagick-register-types))
+  ;; Wrap text in messages
+  (add-hook! 'mu4e-view-mode-hook
+    (setq-local truncate-lines nil))
 
-    (after! evil
-      (cl-loop for str in '((mu4e-main-mode . normal)
-                            (mu4e-view-mode . normal)
-                            (mu4e-headers-mode . normal)
-                            (mu4e-compose-mode . normal)
-                            (mu4e~update-mail-mode . normal))
-               do (evil-set-initial-state (car str) (cdr str)))
+  (when (fboundp 'imagemagick-register-types)
+    (imagemagick-register-types))
 
-      (setq mu4e-view-mode-map (make-sparse-keymap)
-            ;; mu4e-compose-mode-map (make-sparse-keymap)
-            mu4e-headers-mode-map (make-sparse-keymap)
-            mu4e-main-mode-map (make-sparse-keymap))
+  (cl-loop for str in '((mu4e-main-mode . normal)
+                        (mu4e-view-mode . normal)
+                        (mu4e-headers-mode . normal)
+                        (mu4e-compose-mode . normal)
+                        (mu4e~update-mail-mode . normal))
+           do (evil-set-initial-state (car str) (cdr str)))
 
-      (map! (:map (mu4e-main-mode-map mu4e-view-mode-map)
-              :localleader
-              :n "s" #'mu4e-context-switch
-              :n "b" #'mu4e-headers-search-bookmark
-              :n "B" #'mu4e-headers-search-bookmark-edit
-              :n "j" #'mu4e~headers-jump-to-maildir
-              :n "/" #'mu4e-headers-search)
-
-            (:map (mu4e-headers-mode-map mu4e-view-mode-map)
-              :localleader
-              :n "f" #'mu4e-compose-forward
-              :n "r" #'mu4e-compose-reply
-              :n "c" #'mu4e-compose-new
-              :n "e" #'mu4e-compose-edit)
-
-            (:map mu4e-main-mode-map
-              :n "J"   #'mu4e~headers-jump-to-maildir
-              :n "s"   #'mu4e-headers-search
-              :n "q"   #'mu4e-quit
-              :n "u"   #'mu4e-update-index
-              :n "U"   #'mu4e-update-mail-and-index
-              :n "J"   #'mu4e~headers-jump-to-maildir
-              :n "c"   #'mu4e-compose-new
-              :n "b"   #'mu4e-headers-search-bookmark)
-
-            (:map mu4e-headers-mode-map
-              :n "q"   #'mu4e~headers-quit-buffer
-              :n "r"   #'mu4e-compose-reply
-              :n "c"   #'mu4e-compose-edit
-              :n "s"   #'mu4e-headers-search-edit
-              :n "S"   #'mu4e-headers-search-narrow
-              :n "RET" #'mu4e-headers-view-message
-              :n "u"   #'mu4e-headers-mark-for-unmark
-              :n "U"   #'mu4e-mark-unmark-all
-              :n "v"   #'evil-visual-line
-              :nv "d"  #'mu4e-headers-mark-for-delete
-              :nv "a"  #'mu4e-headers-mark-for-refile
-              :n "x"   #'mu4e-mark-execute-all
-
-              :n "]]"  #'mu4e-headers-next-unread
-              :n "[["  #'mu4e-headers-prev-unread
-
-              (:localleader
-                :n "s" 'mu4e-headers-change-sorting
-                :n "t" 'mu4e-headers-toggle-threading
-                :n "r" 'mu4e-headers-toggle-include-related
-                :n "a" #'mu4e-headers-action
-                :n "%" #'mu4e-headers-mark-pattern
-                :n "t" #'mu4e-headers-mark-subthread
-                :n "T" #'mu4e-headers-mark-thread
-                :n "/" #'mu4e-headers-search-narrow))
-
-            (:map mu4e-view-mode-map
-              :n "q" #'mu4e~view-quit-buffer
-              :n "r" #'mu4e-compose-reply
-              :n "c" #'mu4e-compose-edit
-              :n "o" #'ace-link-mu4e
-              :n "O" #'mu4e-view-go-to-url
-              :n "d"  #'mu4e-view-mark-for-delete
-              :n "a"  #'mu4e-view-mark-for-refile
-
-              :n "<M-Left>"  #'mu4e-view-headers-prev
-              :n "<M-Right>" #'mu4e-view-headers-next
-              :n "[m" #'mu4e-view-headers-prev
-              :n "]m" #'mu4e-view-headers-next
-              :n "[u" #'mu4e-view-headers-prev-unread
-              :n "]u" #'mu4e-view-headers-next-unread
-
-              (:localleader
-                :n "%" #'mu4e-view-mark-pattern
-                :n "t" #'mu4e-view-mark-subthread
-                :n "T" #'mu4e-view-mark-thread
-                :n "a" #'mu4e-view-action
-                :n "o" #'mu4e-view-open-attachment
-                :n "d" #'mu4e-view-mark-for-trash
-                :n "r" #'mu4e-view-mark-for-refile
-                :n "m" #'mu4e-view-mark-for-move))
-
-            (:map mu4e~update-mail-mode-map
-              :n "q" #'mu4e-kill-update-mail))))
+  (setq mu4e-view-mode-map (make-sparse-keymap)
+        mu4e-headers-mode-map (make-sparse-keymap)
+        mu4e-main-mode-map (make-sparse-keymap))
 
 
   (use-package mu4e-maildirs-extension
-    :after mu4e
-    :config (mu4e-maildirs-extension))
+               :after mu4e
+               :config (mu4e-maildirs-extension))
 
 
   (defun bmail-refile-folder-function (msg)
@@ -4830,17 +4610,16 @@ Configuration
     (bmacs/file-as-string
      (expand-file-name (concat "~/.signatures/" address))))
 
-  (after! mu4e
-    (setq mu4e-refile-folder #'bmail-refile-folder-function
-          mu4e-trash-folder #'bmail-trash-folder-function
-          smtpmail-debug-info t
-          smtpmail-stream-type 'ssl
-          smtpmail-default-smtp-server "smtp.fastmail.com"
-          smtpmail-smtp-server "smtp.fastmail.com"
-          smtpmail-smtp-user "gilbertw1@fastmail.com"
-          smtpmail-smtp-service 465)
+  (setq mu4e-refile-folder #'bmail-refile-folder-function
+        mu4e-trash-folder #'bmail-trash-folder-function
+        smtpmail-debug-info t
+        smtpmail-stream-type 'ssl
+        smtpmail-default-smtp-server "smtp.fastmail.com"
+        smtpmail-smtp-server "smtp.fastmail.com"
+        smtpmail-smtp-user "gilbertw1@fastmail.com"
+        smtpmail-smtp-service 465)
 
-    (setq mu4e-contexts
+  (setq mu4e-contexts
         `(,(make-mu4e-context
             :name "fastmail"
             :match-func (lambda (msg) (when msg
@@ -4880,7 +4659,6 @@ Configuration
                     (user-mail-address         . "bryan@stream.live")
                     (user-full-name            . "Bryan Gilbert")
                     (mu4e-compose-signature    . (email-signature "bryan@stream.live")))))))
-
 #+END_SRC
 
 *** Fix Mark Emails in Region
@@ -7546,6 +7324,22 @@ session)."
  :nv "L"  #'evil-last-non-blank
  ;; search avy goto
  :nv "C-f"  #'avy-goto-char-timer
+ ;; evil-commentary
+ :n  "gc" #'evil-commentary
+ ;; avy goto char
+ :n "s"   #'avy-goto-char-2
+ ;; evil-surround
+ :v  "s"  #'evil-surround-region
+ :o  "s"  #'evil-surround-edit
+ :o  "S"  #'evil-Surround-edit
+ ;; expand-region
+ :v  "v"  #'er/expand-region
+ :v  "V"  #'er/contract-region
+ ;; save buffer (but don't close window)
+ :n "zz"  #'save-buffer
+ :v "J" (concat ":m '>+1" (kbd "RET") "gv=gv")
+ :v "K" (concat ":m '<-2" (kbd "RET") "gv=gv")
+ :n "K" #'evil-previous-line
 
  (:map evil-window-map ; prefix "C-w"
    ;; Navigation
@@ -7623,31 +7417,6 @@ session)."
    "C-SPC"   #'counsel-git-grep-recenter   ; preview
    "M-RET"   (+ivy-do-action! #'+ivy-git-grep-other-window-action))
 
- ;; evil-commentary
- :n  "gc" #'evil-commentary
-
- ;; evil-exchange
- :n  "gx" #'evil-exchange
-
- ;; avy goto char
- :n "s"   #'avy-goto-char-2
-
- ;; evil-surround
- :v  "s"  #'evil-surround-region
- :o  "s"  #'evil-surround-edit
- :o  "S"  #'evil-Surround-edit
-
- ;; expand-region
- :v  "v"  #'er/expand-region
- :v  "V"  #'er/contract-region
-
- ;; flycheck
- :m  "]e" #'next-error
- :m  "[e" #'previous-error
-
- ;; save buffer (but don't close window)
- :n "zz"  #'save-buffer
-
  (:after eldoc-eval
    (:map eldoc-in-minibuffer-mode-map
      "C-n" #'next-history-element
@@ -7660,14 +7429,6 @@ session)."
      :n "j"   #'flycheck-error-list-next-error
 
      :n "RET" #'flycheck-error-list-goto-error))
-
- ;; flyspell
- :m  "]S" #'flyspell-correct-word-generic
- :m  "[S" #'flyspell-correct-previous-word-generic
-
- ;; git-gutter
- :m  "]d" #'git-gutter:next-hunk
- :m  "[d" #'git-gutter:previous-hunk
 
  ;; git-timemachine
  (:after git-timemachine
@@ -7693,10 +7454,6 @@ session)."
      :n "s"   #'gist-star
      :n "S"   #'gist-unstar
      :n "y"   #'gist-print-current-url))
-
- ;; hl-todo
- :m  "]t" #'hl-todo-next
- :m  "[t" #'hl-todo-previous
 
  ;; ivy
  (:after ivy
@@ -7726,6 +7483,88 @@ session)."
        :desc "switch to ivy wgrep mode"    :n "," 'ivy-wgrep-change-to-wgrep-mode
        :desc "switch to ivy wgrep mode"    :n "w" 'ivy-wgrep-change-to-wgrep-mode)))
 
+ (:after mu4e
+   (:map (mu4e-main-mode-map mu4e-view-mode-map)
+     :localleader
+     :n "s" #'mu4e-context-switch
+     :n "b" #'mu4e-headers-search-bookmark
+     :n "B" #'mu4e-headers-search-bookmark-edit
+     :n "j" #'mu4e~headers-jump-to-maildir
+     :n "/" #'mu4e-headers-search)
+
+   (:map (mu4e-headers-mode-map mu4e-view-mode-map)
+     :localleader
+     :n "f" #'mu4e-compose-forward
+     :n "r" #'mu4e-compose-reply
+     :n "c" #'mu4e-compose-new
+     :n "e" #'mu4e-compose-edit)
+
+   (:map mu4e-main-mode-map
+     :n "J"   #'mu4e~headers-jump-to-maildir
+     :n "s"   #'mu4e-headers-search
+     :n "q"   #'mu4e-quit
+     :n "u"   #'mu4e-update-index
+     :n "U"   #'mu4e-update-mail-and-index
+     :n "J"   #'mu4e~headers-jump-to-maildir
+     :n "c"   #'mu4e-compose-new
+     :n "b"   #'mu4e-headers-search-bookmark)
+
+   (:map mu4e-headers-mode-map
+     :n "q"   #'mu4e~headers-quit-buffer
+     :n "r"   #'mu4e-compose-reply
+     :n "c"   #'mu4e-compose-edit
+     :n "s"   #'mu4e-headers-search-edit
+     :n "S"   #'mu4e-headers-search-narrow
+     :n "RET" #'mu4e-headers-view-message
+     :n "u"   #'mu4e-headers-mark-for-unmark
+     :n "U"   #'mu4e-mark-unmark-all
+     :n "v"   #'evil-visual-line
+     :nv "d"  #'mu4e-headers-mark-for-delete
+     :nv "a"  #'mu4e-headers-mark-for-refile
+     :n "x"   #'mu4e-mark-execute-all
+
+     :n "]]"  #'mu4e-headers-next-unread
+     :n "[["  #'mu4e-headers-prev-unread
+
+     (:localleader
+       :n "s" 'mu4e-headers-change-sorting
+       :n "t" 'mu4e-headers-toggle-threading
+       :n "r" 'mu4e-headers-toggle-include-related
+       :n "a" #'mu4e-headers-action
+       :n "%" #'mu4e-headers-mark-pattern
+       :n "t" #'mu4e-headers-mark-subthread
+       :n "T" #'mu4e-headers-mark-thread
+       :n "/" #'mu4e-headers-search-narrow))
+
+   (:map mu4e-view-mode-map
+     :n "q" #'mu4e~view-quit-buffer
+     :n "r" #'mu4e-compose-reply
+     :n "c" #'mu4e-compose-edit
+     :n "o" #'ace-link-mu4e
+     :n "O" #'mu4e-view-go-to-url
+     :n "d"  #'mu4e-view-mark-for-delete
+     :n "a"  #'mu4e-view-mark-for-refile
+
+     :n "<M-Left>"  #'mu4e-view-headers-prev
+     :n "<M-Right>" #'mu4e-view-headers-next
+     :n "[m" #'mu4e-view-headers-prev
+     :n "]m" #'mu4e-view-headers-next
+     :n "[u" #'mu4e-view-headers-prev-unread
+     :n "]u" #'mu4e-view-headers-next-unread
+
+     (:localleader
+       :n "%" #'mu4e-view-mark-pattern
+       :n "t" #'mu4e-view-mark-subthread
+       :n "T" #'mu4e-view-mark-thread
+       :n "a" #'mu4e-view-action
+       :n "o" #'mu4e-view-open-attachment
+       :n "d" #'mu4e-view-mark-for-trash
+       :n "r" #'mu4e-view-mark-for-refile
+       :n "m" #'mu4e-view-mark-for-move))
+
+   (:map mu4e~update-mail-mode-map
+     :n "q" #'mu4e-kill-update-mail))
+
  ;; neotree
  (:after neotree
    (:map neotree-mode-map
@@ -7753,6 +7592,105 @@ session)."
      :n "q"         #'neotree-hide
      :n "R"         #'neotree-refresh))
 
+ ;; org mode
+ (:after org
+   (:map org-mode-map
+     "RET" #'org-return-indent
+     "C-j" nil
+     "C-k" nil)
+
+   (:map +org-evil-mode-map
+     :n "RET" #'+borg/dwim-at-point
+     :i "RET" #'evil-ret
+     ;; Navigate table cells
+     :i  "M-l"   #'+borg/table-next-field
+     :i  "M-h"   #'+borg/table-previous-field
+     :i  "M-k"   #'+borg/table-previous-row
+     :i  "M-j"   #'+borg/table-next-row
+
+     :i  [tab]     #'+borg/indent-or-next-field-or-yas-expand
+     :i  [backtab] #'+borg/dedent-or-prev-field
+
+     :nv "j"   #'evil-next-visual-line
+     :nv "k"   #'evil-previous-visual-line
+
+     :ni [M-return]   (λ! (+borg/insert-item 'below))
+     :ni [S-M-return] (λ! (+borg/insert-item 'above))
+     :ni [C-return]   (λ! (+borg/insert-item 'below))
+     :ni [S-C-return] (λ! (+borg/insert-item 'above))
+
+     :ni "S-SPC" #'org-cycle
+
+     :n  "C-j"   #'org-next-visible-heading
+     :n  "C-k"   #'org-previous-visible-heading
+     :n  "C-S-j"     #'org-forward-heading-same-level
+     :n  "C-S-k"     #'org-backward-heading-same-level
+
+     ;; Evil-org
+     :niv "M-h" #'org-metaleft
+     :niv "M-l" #'org-metaright
+     :niv "M-k" #'org-metaup
+     :niv "M-j" #'org-metadown
+     :niv "M-L" #'org-shiftmetaright
+     :niv "M-H" #'org-shiftmetaleft
+     :niv "M-K" #'org-shiftmetaup
+     :niv "M-J" #'org-shiftmetadown
+     :niv "M-o" '(lambda () (interactive)
+                   (evil-org-eol-call
+                    '(lambda()
+                       (org-insert-heading)
+                       (org-metaright))))
+     :niv "C-t" '(lambda () (interactive)
+                   (evil-org-eol-call
+                    '(lambda()
+                       (org-insert-todo-heading nil)
+                       (org-metaright))))
+     :niv "M-t" '(lambda () (interactive)
+                   (evil-org-eol-call
+                    '(lambda()
+                       (org-insert-todo-heading nil)
+                       (org-metaright))))
+
+     (:localleader
+       :n  "RET" #'org-archive-subtree
+       :n  "SPC" #'+borg/toggle-checkbox
+       :n  "/"   #'org-sparse-tree
+       :n  "="   #'org-align-all-tags
+       :n  "?"   #'org-tags-view
+       :n  "a"   #'org-agenda
+       :n  "d"   #'org-time-stamp
+       :n  "D"   #'org-deadline
+       :n  "e"   #'org-edit-special
+       :n  "E"   #'+borg/edit-special-same-window
+       :n  "i"   (lambda () (if (and (boundp 'iimage-mode) iimage-mode) (iimage-mode -1) (iimage-mode +1)))
+       :n  "n"   (lambda () (if (buffer-narrowed-p) (widen) (org-narrow-to-subtree)))
+       :n  "r"   #'org-refile
+       :n  "R"   (lambda () (org-metaleft) (org-archive-to-archive-sibling)) ; archive to parent sibling
+       :n  "s"   #'org-schedule
+       :n  "t"   #'counsel-org-tag
+       :v  "t"   (lambda () (evil-ex-normal evil-visual-beginning evil-visual-end "\\t"))
+       :n  "T"   #'org-todo
+       :n  "v"   #'variable-pitch-mode
+       :nv "l"   #'org-insert-link
+       :nv "L"   #'org-store-link
+       :n  "+"   #'org-timestamp-up-day
+       :n  "-"   #'org-timestamp-down-day)
+
+     :n  "<"   #'org-metaleft
+     :n  ">"   #'org-metaright
+     :v  "<"   (lambda () (org-metaleft)  (evil-visual-restore))
+     :v  ">"   (lambda () (org-metaright) (evil-visual-restore))))
+
+ ;; org agenda
+ (:after org-agenda
+    (:map org-agenda-mode-map
+      :e "<escape>" #'org-agenda-Quit
+      :e "m"   #'org-agenda-month-view
+      :e "C-j" #'org-agenda-next-item
+      :e "C-k" #'org-agenda-previous-item
+      :e "C-n" #'org-agenda-next-item
+      :e "C-p" #'org-agenda-previous-item))
+
  ;; realgud
  (:after realgud
    (:map realgud:shortkey-mode-map
@@ -7764,25 +7702,6 @@ session)."
      :m "b" #'realgud:cmd-break
      :m "B" #'realgud:cmd-clear
      :n "c" #'realgud:cmd-continue))
-
- ;; rotate-text
- :n  "!"  #'rotate-text
-
- ;; smart-forward TODO
- ;; :nv "C-k"  #'smart-up
- ;; :nv "C-j"  #'smart-down
-
- ;; evil visual restore
- :n "gv" #'evil-visual-restore
-
- ;; move selection
- :v "J" (concat ":m '>+1" (kbd "RET") "gv=gv")
- :v "K" (concat ":m '<-2" (kbd "RET") "gv=gv")
-
- :n "K" #'evil-previous-line
-
- ;; undo-tree -- undo/redo for visual regions
- :v "C-r" #'undo-tree-redo
 
  ;; yasnippet
  (:after yasnippet
