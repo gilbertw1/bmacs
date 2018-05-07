@@ -838,6 +838,60 @@ If STRICT-P, return nil if no project was found, otherwise return
         (t (keyboard-quit))))
 
 (global-set-key [remap keyboard-quit] #'bmacs/escape)
+
+(defun bmacs/backward-kill-to-bol-and-indent ()
+  "Kill line to the first non-blank character. If invoked again
+afterwards, kill line to beginning of line."
+  (interactive)
+  (let ((empty-line-p (save-excursion (beginning-of-line)
+                                      (looking-at-p "[ \t]*$"))))
+    (funcall #'evil-delete (point-at-bol) (point))
+    (unless empty-line-p
+      (indent-according-to-mode))))
+
+(defun bmacs/backward-to-bol-or-indent ()
+  "Jump between the indentation column (first non-whitespace character) and the
+beginning of the line. The opposite of
+`doom/forward-to-last-non-comment-or-eol'."
+  (interactive)
+  (let ((pos (point))
+        (indent (save-excursion
+                  (beginning-of-visual-line)
+                  (skip-chars-forward " \t\r")
+                  (point))))
+    (cond ((or (> pos indent) (= pos (line-beginning-position)))
+           (goto-char indent))
+          ((<= pos indent)
+           (beginning-of-visual-line)))))
+
+(defun bmacs/forward-to-last-non-comment-or-eol ()
+  "Jumps between the last non-blank, non-comment character in the line and the
+true end of the line. The opposite of `doom/backward-to-bol-or-indent'."
+  (interactive)
+  (let ((eol (save-excursion (if visual-line-mode
+                                 (end-of-visual-line)
+                               (end-of-line))
+                             (point))))
+    (if (and (sp-point-in-comment) (not (= (point) eol)))
+        (goto-char eol)
+      (let* ((bol (save-excursion (beginning-of-visual-line) (point)))
+             (boc (or (save-excursion
+                        (if (not comment-use-syntax)
+                            (progn
+                              (goto-char bol)
+                              (when (re-search-forward comment-start-skip eol t)
+                                (or (match-end 1) (match-beginning 0))))
+                          (goto-char eol)
+                          (while (and (sp-point-in-comment)
+                                      (> (point) bol))
+                            (backward-char))
+                          (skip-chars-backward " " bol)
+                          (point)))
+                      eol)))
+        (cond ((= boc (point))
+               (goto-char eol))
+              ((/= bol boc)
+               (goto-char boc)))))))
 #+END_SRC
 
 ** Core Settings
@@ -1409,6 +1463,12 @@ Like vim but better.
   (evil-select-search-module 'evil-search-module 'evil-search)
 
   ;; Set cursor colors later, once theme is loaded
+  (defun +evil*init-cursors (&rest _)
+    (setq evil-default-cursor (face-background 'cursor nil t)
+          evil-normal-state-cursor 'box
+          evil-emacs-state-cursor  `(,(face-foreground 'warning) box)
+          evil-insert-state-cursor 'bar
+          evil-visual-state-cursor 'hollow))
   (advice-add #'load-theme :after #'+evil*init-cursors)
 
   ;; default modes
@@ -1625,6 +1685,18 @@ Making everything all ivy-ed up.
 
 #+BEGIN_SRC emacs-lisp
 (use-package counsel-projectile
+  :after counsel
+  :config
+  (defun +ivy-projectile-find-file-transformer (str)
+  "Highlight entries that have been visited. This is the opposite of
+`counsel-projectile-find-file'."
+    (cond ((get-file-buffer (projectile-expand-root str))
+           (propertize str 'face '(:weight ultra-bold :slant italic :foreground "#51afef")))
+          (t str)))
+  (ivy-set-display-transformer #'counsel-projectile-find-file #'+ivy-projectile-find-file-transformer))
+
+(use-package counsel
+  :demand t
   :init
   (map! [remap apropos]                  #'counsel-apropos
         [remap bookmark-jump]            #'counsel-bookmark
@@ -1639,17 +1711,6 @@ Making everything all ivy-ed up.
         [remap recentf-open-files]       #'counsel-recentf
         [remap org-capture]              #'counsel-org-capture
         [remap swiper]                   #'counsel-grep-or-swiper)
-  :config
-  (defun +ivy-projectile-find-file-transformer (str)
-  "Highlight entries that have been visited. This is the opposite of
-`counsel-projectile-find-file'."
-    (cond ((get-file-buffer (projectile-expand-root str))
-           (propertize str 'face '(:weight ultra-bold :slant italic :foreground "#51afef")))
-          (t str)))
-  (ivy-set-display-transformer #'counsel-projectile-find-file #'+ivy-projectile-find-file-transformer))
-
-(use-package counsel
-  :demand t
   :config
   (require 'counsel-projectile)
   (setq counsel-find-file-ignore-regexp "\\(?:^[#.]\\)\\|\\(?:[#~]$\\)\\|\\(?:^Icon?\\)")
@@ -1877,7 +1938,6 @@ Allows for creation of isolated workspaces
           (after-persp (apply switch-fun args)))
       (when (not (string= before-persp after-persp))
         (setq +workspaces-last-persp before-persp))))
-
   (advice-add #'persp-switch :around #'+workspaces*track-last-persp)
   (add-hook 'bmacs-post-init-hook #'(lambda () (persp-mode 1))))
 #+END_SRC
@@ -4791,8 +4851,67 @@ A terminal by Emacs for Emacs!
 **** Functions
 
 #+BEGIN_SRC emacs-lisp
+(defface +eshell-prompt-pwd '((t :inherit eshell-prompt))
+  "TODO")
+
+(defface +eshell-prompt-git-branch '((t :inherit font-lock-function-name-face))
+  "TODO")
+
+(defface +eshell-prompt-char '((t :inherit font-lock-constant-face))
+  "TODO")
+
+
+(defvar +eshell-buffers (make-ring 25)
+  "List of open eshell buffers.")
+
+(defvar +eshell-buffer-name "*bmacs eshell*"
+  "The name to use for custom eshell buffers. This only affects `+eshell/open',
+`+eshell/open-popup'")
+
+(defvar +eshell-last-buffer nil
+  "TODO")
+
+
+;;
+;; Library
+;;
+
 (defun +eshell--outside-prompt-p ()
   (< (point) eshell-last-output-end))
+
+(defun +eshell/popup ()
+  (interactive)
+  (let ((eshell-window (get-buffer-window "*eshell*")))
+    (if eshell-window
+      (delete-window eshell-window)
+      (eshell))))
+
+(defun +eshell/project-popup ()
+  (interactive)
+  (let ((eshell-window (get-buffer-window "*eshell-project*")))
+    (if eshell-window
+      (delete-window eshell-window)
+      (let ((eshell-buffer-name "*eshell-project*")
+            (eshell-directory-name (bmacs-project-root)))
+        (eshell)))))
+
+(defun +eshell--current-git-branch ()
+  (let ((branch (car (cl-loop for match in (split-string (shell-command-to-string "git branch") "\n")
+                              if (string-match-p "^\*" match)
+                              collect match))))
+    (if (not (eq branch nil))
+        (format " [%s]" (substring branch 2))
+      "")))
+
+(defun +eshell-prompt ()
+  "Generate the prompt string for eshell. Use for `eshell-prompt-function'."
+  (concat (propertize (abbreviate-file-name (eshell/pwd)) 'face '+eshell-prompt-pwd)
+          (propertize (+eshell--current-git-branch) 'face '+eshell-prompt-git-branch)
+          (propertize " λ " 'face '+eshell-prompt-char)))
+
+;;
+;; Keybinds
+;;
 
 (defun +eshell/evil-append ()
   (interactive)
@@ -4839,35 +4958,6 @@ A terminal by Emacs for Emacs!
   (when (+eshell--outside-prompt-p)
     (goto-char eshell-last-output-end))
   (call-interactively #'evil-change-line))
-
-(defun +eshell/popup ()
-  (interactive)
-  (let ((eshell-window (get-buffer-window "*eshell*")))
-    (if eshell-window
-      (delete-window eshell-window)
-      (eshell))))
-
-(defun +eshell/project-popup ()
-  (interactive)
-  (let ((eshell-window (get-buffer-window "*eshell-project*")))
-    (if eshell-window
-      (delete-window eshell-window)
-      (let ((eshell-buffer-name "*eshell-project*")
-            (eshell-directory-name (bmacs-project-root)))
-        (eshell)))))
-
-(defun +eshell-prompt ()
-  (concat (propertize (abbreviate-file-name (eshell/pwd)) 'face 'eshell-prompt)
-          (propertize (+eshell--current-git-branch) 'face 'font-lock-function-name-face)
-          (propertize " λ " 'face 'font-lock-constant-face)))
-
-(defun +eshell--current-git-branch ()
-  (let ((branch (car (loop for match in (split-string (shell-command-to-string "git branch") "\n")
-                           when (string-match "^\*" match)
-                           collect match))))
-    (if (not (eq branch nil))
-        (concat " [" (substring branch 2) "]")
-      "")))
 #+END_SRC
 
 **** Config
@@ -4877,36 +4967,57 @@ A terminal by Emacs for Emacs!
   :commands eshell-mode
   :init
   (setq eshell-directory-name (concat bmacs-etc-dir "/eshell")
+        eshell-rc-script "~/.eshellrc"
+        eshell-aliases-file "~/.eshell_aliases"
+        ;;
         eshell-scroll-to-bottom-on-input 'all
         eshell-scroll-to-bottom-on-output 'all
         eshell-buffer-shorthand t
         eshell-kill-processes-on-exit t
+        eshell-error-if-no-glob t
+        eshell-hist-ignoredups t
         ;; em-prompt
         eshell-prompt-regexp "^.* λ "
         eshell-prompt-function #'+eshell-prompt
         ;; em-glob
         eshell-glob-case-insensitive t
-        eshell-error-if-no-glob t
-        ;; em-alias
-        eshell-aliases-file (concat bmacs-local-dir ".eshell-aliases"))
-
+        eshell-error-if-no-glob t)
   :config
-  (add-to-list 'evil-insert-state-modes 'eshell-mode)
 
   (after! em-term
     ;; Visual commands require a proper terminal. Eshell can't handle that, so it
     ;; delegates these commands to a term buffer.
-    (nconc eshell-visual-commands '("tmux" "htop" "bash" "zsh" "fish" "vim" "nvim"))
-    (setq eshell-visual-subcommands '(("git" "log" "l" "diff" "show"))))
+    (setq eshell-visual-commands
+          (append eshell-visual-commands '("tmux" "htop" "bash" "zsh" "fish" "vim" "nvim"))
+          eshell-visual-subcommands '(("git" "log" "l" "diff" "show"))))
 
-  ;; Aliases
-  (setq eshell-command-aliases-list
-        '(("q"   "exit")
-          ("l"   "ls -1")
-          ("ll"  "ls -l")
-          ("la"  "ls -la")
-          ("g"   "hub")
-          ("gs"  "hub status --short ."))))
+  (defun +eshell|init-keymap ()
+    "Setup eshell keybindings. This must be done in a hook because eshell-mode
+redefines its keys every time `eshell-mode' is enabled."
+    (map! :map eshell-mode-map
+          :n "i"        #'+eshell/evil-prepend-maybe
+          :n "I"        #'+eshell/evil-prepend
+          :n "a"        #'+eshell/evil-append-maybe
+          :n "A"        #'+eshell/evil-append
+          :n "r"        #'+eshell/evil-replace-maybe
+          :n "R"        #'+eshell/evil-replace-state-maybe
+          :n "c"        #'+eshell/evil-change
+          :n "C"        #'+eshell/evil-change-line
+          :i [tab]      #'eshell-pcomplete
+          :i "SPC"      #'self-insert-command
+          :i "C-u"      #'eshell-kill-input
+          :i "C-a"      #'eshell-bol
+          :i "C-d"      #'+eshell/quit-or-delete-char
+          :i "C-k"      #'kill-line
+          :i "C-p"      #'eshell-previous-input
+          :i "<up>"     #'eshell-previous-input
+          :i "C-n"      #'eshell-next-input
+          :i "<down>"   #'eshell-next-input
+          :m "<return>" #'+eshell/evil-append
+          :i "<return>" #'eshell-send-input          
+          [remap bmacs/backward-to-bol-or-indent] #'eshell-bol
+          [remap bmacs/backward-kill-to-bol-and-indent] #'eshell-kill-input))
+  (add-hook 'eshell-first-time-mode-hook #'+eshell|init-keymap))
 #+END_SRC
 
 *** Imenu
@@ -6476,6 +6587,8 @@ Now we're going to create a set of rules based on the buffers we would like to b
 (bmacs/make-popup (rx bos "*HTTP Response*" eos))
 ;; Eshell
 (bmacs/make-popup (rx bos "*eshell*" eos))
+;; Bmacs Eshell
+(bmacs/make-popup (rx bos "*bmacs eshell*" eos))
 ;; Eshell Project Buffer
 (bmacs/make-popup (rx bos "*eshell-project*" eos))
 ;; Flycheck Errors
@@ -7412,35 +7525,6 @@ session)."
      "C-n" #'next-history-element
      "C-p" #'previous-history-element))
 
-(:after eshell
-  (:map eshell-mode-map
-    :n "i"        #'+eshell/evil-prepend-maybe
-    :n "I"        #'+eshell/evil-prepend
-    :n "a"        #'+eshell/evil-append-maybe
-    :n "A"        #'+eshell/evil-append
-    :n "r"        #'+eshell/evil-replace-maybe
-    :n "R"        #'+eshell/evil-replace-state-maybe
-    :n "c"        #'+eshell/evil-change
-    :n "C"        #'+eshell/evil-change-line
-    :i [tab]      #'eshell-pcomplete
-    :i "SPC"      #'self-insert-command
-    :i "C-u"      #'eshell-kill-input
-    :i "C-a"      #'eshell-bol
-    :i "C-d"      #'+eshell/quit-or-delete-char
-    :i "C-k"      #'kill-line
-    :i "C-p"      #'eshell-previous-input
-    :i "<up>"     #'eshell-previous-input
-    :i "C-n"      #'eshell-next-input
-    :i "<down>"   #'eshell-next-input
-    :m "<return>" #'+eshell/evil-append
-    ;; BMACS - needed to actually send input and use shell
-    :i "<return>" #'eshell-send-input
-    :n [remap evil-window-split]     #'+eshell/split
-    :n [remap evil-window-vsplit]    #'+eshell/vsplit
-    :n [remap evil-record-macro]     #'eshell-life-is-too-much
-    [remap kill-this-buffer] #'eshell-life-is-too-much
-    [remap +workspace/close-window-or-workspace] #'eshell-life-is-too-much))
-
  (:after flycheck
    (:map flycheck-error-list-mode-map
      :n "C-n" #'flycheck-error-list-next-error
@@ -7616,9 +7700,7 @@ session)."
    (:map org-mode-map
      "RET" #'org-return-indent
      "C-j" nil
-     "C-k" nil)
-
-   (:map +org-evil-mode-map
+     "C-k" nil
      :n "RET" #'+borg/dwim-at-point
      :i "RET" #'evil-ret
      ;; Navigate table cells
@@ -7756,17 +7838,17 @@ session)."
       ;; indentation. Pressing it again will send you to the true bol. Same goes
       ;; for C-e, except it will ignore comments and trailing whitespace before
       ;; jumping to eol.
-      :i "C-a" #'doom/backward-to-bol-or-indent
-      :i "C-e" #'doom/forward-to-last-non-comment-or-eol
-      :i "C-u" #'doom/backward-kill-to-bol-and-indent
+      :i "C-a" #'bmacs/backward-to-bol-or-indent
+      :i "C-e" #'bmacs/forward-to-last-non-comment-or-eol
+      :i "C-u" #'bmacs/backward-kill-to-bol-and-indent
 
       ;; textmate-esque newline insertion
       :i [C-return]     #'evil-open-below
       :i [S-C-return]   #'evil-open-above
       ;; textmate-esque deletion
-      [C-backspace]     #'doom/backward-kill-to-bol-and-indent
+      [C-backspace]     #'bmacs/backward-kill-to-bol-and-indent
       :i [backspace]    #'delete-backward-char
-      :i [C-backspace]  #'doom/backward-kill-to-bol-and-indent
+      :i [C-backspace]  #'bmacs/backward-kill-to-bol-and-indent
       ;; Emacsien motions for insert mode
       :i "C-b" #'backward-word
       :i "C-f" #'forward-word
