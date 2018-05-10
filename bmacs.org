@@ -22,6 +22,7 @@
   - [[#emacs-initialization][Emacs Initialization]]
     - [[#initialization-settings][Initialization Settings]]
     - [[#initialize-and-add-package-sources][Initialize and Add Package Sources]]
+    - [[#libraries][Libraries]]
   - [[#doom-macros][DOOM! Macros]]
     - [[#after][after!]]
     - [[#map][map!]]
@@ -29,10 +30,10 @@
     - [[#quiet][quiet!]]
     - [[#def-memoized][def-memoized!]]
     - [[#λ][λ!]]
+    - [[#def-menu][def-menu!]]
   - [[#helper-functions][Helper Functions]]
   - [[#core-settings][Core Settings]]
     - [[#charset][Charset]]
-    - [[#libraries][Libraries]]
     - [[#backups][Backups]]
     - [[#history][History]]
     - [[#ui][UI]]
@@ -409,6 +410,15 @@ Add the package directory =mu4e= to the load path.
 #+BEGIN_SRC emacs-lisp
   (eval-and-compile
     (add-to-list 'load-path "/usr/share/emacs/site-lisp/mu4e"))
+#+END_SRC
+
+*** Libraries
+
+#+BEGIN_SRC emacs-lisp
+(use-package async :demand t)
+(use-package f :demand t)
+(use-package subr-x :demand t :ensure nil)
+(eval-when-compile (require 'cl-lib))
 #+END_SRC
 
 ** DOOM! Macros
@@ -814,6 +824,124 @@ have the same meaning as in `defun'."
 
 #+END_SRC
 
+*** def-menu!
+
+#+BEGIN_SRC emacs-lisp
+(defvar doom-menu-display-fn #'doom-menu-read-default
+  "The method to use to prompt the user with the menu. This takes two arguments:
+PROMPT (a string) and COMMAND (a list of command plists; see `def-menu!').")
+
+(defvar-local doom-menu-last-command nil
+  "TODO")
+
+(defun doom-menu-read-default (prompt commands)
+  "Default method for displaying a completion-select prompt."
+  (completing-read prompt (mapcar #'car commands) nil nil nil nil (car doom-menu-last-command)))
+
+(defun doom--menu-read (prompt commands)
+  (if-let* ((choice (funcall doom-menu-display-fn prompt commands)))
+      (assoc choice commands)
+    (user-error "Aborted")))
+
+(defun doom--menu-exec (plist)
+  (save-selected-window
+    (let ((command (plist-get plist :exec))
+          (cwd     (plist-get plist :cwd)))
+      (let ((default-directory
+              (cond ((eq cwd t) (doom-project-root))
+                    ((stringp cwd) cwd)
+                    ((functionp cwd) (funcall cwd))
+                    (t default-directory))))
+        (cond ((stringp command)
+               (let (buf)
+                 (compile command)
+                 (setq buf next-error-last-buffer)
+                 (unless buf
+                   (error "Couldn't create compilation buffer"))
+                 (with-current-buffer buf
+                   (setq header-line-format
+                         (concat (propertize "$ " 'face 'font-lock-doc-face)
+                                 (propertize command 'face 'font-lock-preprocessor-face))))))
+              ((or (symbolp command)
+                   (functionp command))
+               (call-interactively command))
+              ((and command (listp command))
+               (eval command t))
+              (t
+               (error "Not a valid command: %s" command)))))))
+
+(defmacro def-menu! (name desc commands &rest plist)
+  "Defines a menu and returns a function symbol for invoking it.
+
+A dispatcher is an interactive command named NAME (a symbol). When called, this
+dispatcher prompts you to select a command to run. This list is filtered
+depending on its properties. Each command is takes the form of:
+
+  (DESCRIPTION :exec COMMAND &rest PROPERTIES)
+
+PROPERTIES accepts the following properties:
+
+  :when FORM
+  :unless FORM
+  :region BOOL
+  :cwd BOOL|PATH|FUNCTION
+  :project BOOL|PATH|FUNCTION
+
+COMMAND can be a string (a shell command), a symbol (an elisp function) or a
+lisp form.
+
+`def-menu!'s PLIST supports the following properties:
+
+  :prompt STRING"
+  (declare (indent defun) (doc-string 2))
+  (let ((commands-var (intern (format "%s-commands" name)))
+        (prop-prompt (or (plist-get plist :prompt) "> "))
+        (prop-sort   (plist-get plist :sort)))
+    `(progn
+       (defconst ,commands-var
+         ,(if prop-sort
+              `(cl-sort ,commands #'string-lessp :key #'car)
+            commands)
+         ,(format "Menu for %s" name))
+       (defun ,name (arg command)
+         ,(concat
+           (if (stringp desc) (concat desc "\n\n"))
+           "This is a command dispatcher. It will rerun the last command on\n"
+           "consecutive executions. If ARG (universal argument) is non-nil\n"
+           "then it always prompt you.")
+         (declare (interactive-only t))
+         (interactive
+          (list current-prefix-arg
+                (progn
+                  (unless ,commands-var
+                    (user-error "The '%s' menu is empty" ',name))
+                  (doom--menu-read
+                   ,prop-prompt
+                   (or (cl-remove-if-not
+                        (let ((project-root (bmacs-project-root)))
+                          (lambda (cmd)
+                            (let ((plist (cdr cmd)))
+                              (and (cond ((not (plist-member plist :region)) t)
+                                         ((plist-get plist :region) (use-region-p))
+                                         (t (not (use-region-p))))
+                                   (let ((when (plist-get plist :when))
+                                         (unless (plist-get plist :unless))
+                                         (project (plist-get plist :project)))
+                                     (when (functionp project)
+                                       (setq project (funcall project)))
+                                     (or (or (not when) (eval when))
+                                         (or (not unless) (not (eval unless)))
+                                         (and (stringp project)
+                                              (file-in-directory-p (or buffer-file-name default-directory)
+                                                                   project-root))))))))
+                        ,commands-var)
+                       (user-error "No commands available here"))))))
+         (doom--menu-exec
+          (cdr (or (when arg doom-menu-last-command)
+                   (setq doom-menu-last-command command)
+                   (user-error "No command selected"))))))))
+#+END_SRC
+
 ** Helper Functions
 
 #+BEGIN_SRC emacs-lisp
@@ -909,15 +1037,6 @@ Set UTF-8 as the default coding system
 (set-selection-coding-system 'utf-8)
 (setq locale-coding-system   'utf-8)
 (setq-default buffer-file-coding-system 'utf-8)
-#+END_SRC
-
-*** Libraries
-
-#+BEGIN_SRC emacs-lisp
-(use-package async :demand t)
-(use-package f :demand t)
-(use-package subr-x :demand t :ensure nil)
-(require 'cl-lib)
 #+END_SRC
 
 *** Backups
@@ -4147,12 +4266,18 @@ It's org-mode ya'll
   (if (featurep 'org)
       (add-hook 'bmacs-post-init-hook func append)
     (add-hook 'org-load-hook func append)))
+
+(defun evil-org-eol-call (fun)
+  "Go to end of line and call provided function.
+FUN function callback"
+  (end-of-line)
+  (funcall fun)
+  (evil-append nil))
 #+END_SRC
 
 **** Configuration
 
 #+BEGIN_SRC emacs-lisp
-
 (use-package org
   :ensure org-plus-contrib
   :pin org
@@ -4177,9 +4302,6 @@ It's org-mode ya'll
              :commands toc-org-enable
              :init (add-hook 'org-mode-hook #'toc-org-enable))
 
-;; The standard unicode characters are usually misaligned depending on the font.
-;; This bugs me. Personally, markdown #-marks for headlines are more elegant, so
-;; we use those.
 (use-package org-bullets
              :commands org-bullets-mode
              :init (add-hook 'org-mode-hook #'org-bullets-mode))
@@ -4256,14 +4378,6 @@ It's org-mode ya'll
   (setq-default org-completion-use-ido nil
                 org-outline-path-complete-in-steps nil))
 
-(defun evil-org-eol-call (fun)
-  "Go to end of line and call provided function.
-FUN function callback"
-  (end-of-line)
-  (funcall fun)
-  (evil-append nil))
-
-;;
 (defun +borg-hacks ()
   "Getting org to behave."
   ;; Don't open separate windows
@@ -5014,7 +5128,7 @@ redefines its keys every time `eshell-mode' is enabled."
           :i "C-n"      #'eshell-next-input
           :i "<down>"   #'eshell-next-input
           :m "<return>" #'+eshell/evil-append
-          :i "<return>" #'eshell-send-input          
+          :i "<return>" #'eshell-send-input
           [remap bmacs/backward-to-bol-or-indent] #'eshell-bol
           [remap bmacs/backward-kill-to-bol-and-indent] #'eshell-kill-input))
   (add-hook 'eshell-first-time-mode-hook #'+eshell|init-keymap))
@@ -5155,6 +5269,7 @@ TODO - I really have no idea
 
 (setq doom-neotree-file-icons t)
 #+END_SRC
+
 
 ** Programming Languages
 
@@ -6196,11 +6311,21 @@ environment variables."
 The future!
 
 #+BEGIN_SRC emacs-lisp
-(defvar +rust-src-dir (concat bmacs-etc-dir "rust/")
-  "The path to Rust source library. Required by racer.")
-
 (use-package rust-mode
-  :mode "\\.rs$")
+  :mode "\\.rs$"
+  :config
+  (setq rust-indent-method-chain t)
+
+  (map! :map rust-mode-map
+        :localleader
+        :desc "Build menu" :n "b" #'+rust/build-menu)
+
+  (def-menu! +rust/build-menu
+    "TODO"
+    '(("cargo run"   :exec "cargo run --color always")
+      ("cargo build" :exec "cargo build --color always")
+      ("cargo test"  :exec "cargo test --color always"))
+    :prompt "Cargo: "))
 
 (use-package racer
   :after rust-mode
@@ -6210,9 +6335,8 @@ The future!
   :config
 
   (map! :map rust-mode-map
-        :m "gd" #'racer-find-definition
         :localleader
-        :desc "Racer Describe"        :n "d" #'racer-describe
+        :desc "Racer describe"        :n "d" #'racer-describe
         :desc "Racer find definition" :n "D" #'racer-find-definition)
 
   (unless (file-exists-p racer-cmd)
@@ -6579,6 +6703,8 @@ Now we're going to create a set of rules based on the buffers we would like to b
 (bmacs/make-popup (rx bos "*Messages*" eos))
 ;; Backtrace
 (bmacs/make-popup (rx bos "*Backtrace*" eos))
+;; Compilation
+(bmacs/make-popup (rx bos "*compilation*" eos))
 ;; Pretty Print Eval Output
 (bmacs/make-popup (rx bos "*Pp Eval Output*" eos))
 ;; Help
@@ -6615,7 +6741,7 @@ Now we're going to create a set of rules based on the buffers we would like to b
 (bmacs/make-popup (rx bos "*Org Src"))
 (bmacs/make-popup (rx bos "*Edit Formulas*" eos) 0.01)
 (bmacs/make-popup (rx bos "*Org-Babel") 0.25)
-(bmacs/make-popup (rx bos "CAPTURE") 0.2)
+;(bmacs/make-popup (rx bos "CAPTURE") 0.2)
 ;; Scratch Buffer
 (bmacs/make-popup (rx bos "*scratch*" eos) 0.4)
 #+END_SRC
@@ -7512,6 +7638,14 @@ session)."
      "C-k"        #'company-search-repeat-backward
      "C-s"        (λ! (company-search-abort) (company-filter-candidates))
      [escape]     #'company-search-abort))
+
+ ;; compilation-mode
+ (:after compile
+   (:map compilation-mode-map
+     "SPC" nil
+     (:prefix "SPC"
+       (:prefix "b"
+         "d" #'kill-this-buffer))))
 
  ;; counsel
  (:after counsel
