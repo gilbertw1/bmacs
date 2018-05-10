@@ -150,7 +150,6 @@
     - [[#scala][Scala]]
     - [[#shell][Shell]]
     - [[#swift][Swift]]
-    - [[#typescript][Typescript]]
     - [[#web][Web]]
   - [[#misc-1][Misc]]
     - [[#hydra][hydra]]
@@ -394,8 +393,7 @@ previously compiled manually then all of the package initialization will still t
       (add-to-list 'package-archives '("org" . "http://orgmode.org/elpa/") t))
 
     (setq package-pinned-packages
-      '((use-package . "melpa-stable")
-        (evil . "melpa-stable")))
+      '((evil . "melpa-stable")))
 
     (package-initialize)
     (unless (package-installed-p 'use-package)
@@ -5858,6 +5856,28 @@ Python? Lisp? WTF?
 *** Javascript
 Gross
 
+**** Functions
+
+#+BEGIN_SRC emacs-lisp
+(defun +javascript|cleanup-tide-processes ()
+  "TODO"
+  (when tide-mode
+    (unless (cl-loop with root = (tide-project-root)
+                     for buf in (delq (current-buffer) (buffer-list))
+                     if (buffer-local-value 'tide-mode buf)
+                     collect buf)
+      (kill-process (tide-current-server)))))
+
+(defun +javascript*tide-project-root ()
+  "Resolve to `bmacs-project-root' if `tide-project-root' fails."
+  (or tide-project-root
+      (or (locate-dominating-file default-directory "tsconfig.json")
+          (locate-dominating-file default-directory "jsconfig.json"))
+      (bmacs-project-root)))
+#+END_SRC
+
+**** Config
+
 #+BEGIN_SRC emacs-lisp
 (use-package js2-mode
   :mode "\\.js$"
@@ -5865,15 +5885,128 @@ Gross
   :config
   (setq js2-skip-preprocessor-directives t
         js2-highlight-external-variables nil
-        js2-mode-show-parse-errors nil)
+        js-chain-indent t
+        ;; let flycheck handle this
+        js2-mode-show-parse-errors nil
+        js2-mode-show-strict-warnings nil
+        ;; Flycheck provides these features, so disable them: conflicting with
+        ;; the eslint settings.
+        js2-strict-trailing-comma-warning nil
+        js2-strict-missing-semi-warning nil)
 
-  (add-hook! 'js2-mode-hook
-    #'(flycheck-mode highlight-indentation-mode rainbow-delimiters-mode))
+  (add-hook! 'js2-mode-hook #'(flycheck-mode rainbow-delimiters-mode))
+
+  ;; Conform switch-case indentation to js2 normal indent
+  (defvaralias 'js-switch-indent-offset 'js2-basic-offset)
 
   (sp-with-modes '(js2-mode rjsx-mode)
-    (sp-local-pair "/* " " */" :post-handlers '(("| " "SPC")))))
+    (sp-local-pair "/*" "*/" :post-handlers '(("| " "SPC")))))
 
-(use-package nodejs-repl :commands nodejs-repl)
+(use-package typescript-mode
+  :mode "\\.ts$"
+  :config
+  (add-hook! 'typescript-mode-hook #'(flycheck-mode rainbow-delimiters-mode)))
+
+(use-package rjsx-mode
+  :commands rjsx-mode
+  :mode "\\.jsx$"
+  :mode "components/.+\\.js$"
+  :init
+  (defun +javascript-jsx-file-p ()
+    "Detect React or preact imports early in the file."
+    (and buffer-file-name
+         (string= (file-name-extension buffer-file-name) "js")
+         (re-search-forward "\\(^\\s-*import +React\\|\\( from \\|require(\\)[\"']p?react\\)"
+                            magic-mode-regexp-match-limit t)
+         (progn (goto-char (match-beginning 1))
+                (not (sp-point-in-string-or-comment)))))
+
+  (push '(+javascript-jsx-file-p . rjsx-mode) magic-mode-alist)
+  :config
+  (add-hook! 'rjsx-mode-hook
+    ;; jshint doesn't know how to deal with jsx
+    (push 'javascript-jshint flycheck-disabled-checkers))
+
+  ;; `rjsx-electric-gt' relies on js2's parser to tell it when the cursor is in
+  ;; a self-closing tag, so that it can insert a matching ending tag at point.
+  ;; However, the parser doesn't run immediately, so a fast typist can outrun
+  ;; it, causing issues, so force it to parse.
+  (defun +javascript|reparse (n)
+    ;; if n != 0, then rjsx-maybe-reparse will be run elsewhere
+    (if (= n 0) (rjsx-maybe-reparse)))
+  (advice-add #'rjsx-electric-gt :before #'+javascript|reparse))
+
+(use-package coffee-mode
+  :mode "\\.coffee$"
+  :init (setq coffee-indent-like-python-mode t))
+
+(use-package tide
+  :hook ((js2-mode . tide-setup)
+         (typescript-mode . tide-setup))
+  :init
+  (defun +javascript|init-tide-in-web-mode ()
+    (when (string= (file-name-extension (or buffer-file-name "")) "tsx")
+      (tide-setup)))
+  (add-hook 'web-mode-hook #'+javascript|init-tide-in-web-mode)
+  :config
+  (setq tide-completion-detailed t
+        tide-always-show-documentation t)
+  ;; code completion
+  (after! company
+    ;; tide affects the global `company-backends', undo this so doom can handle
+    ;; it buffer-locally
+    (setq-default company-backends (delq 'company-tide (default-value 'company-backends))))
+
+  (add-hook tide-mode-hook #'(lambda ()
+                                (setq-local company-backends '(company-tide))))
+
+  ;; resolve to `doom-project-root' if `tide-project-root' fails
+  (advice-add #'tide-project-root :override #'+javascript*tide-project-root)
+
+  ;; cleanup tsserver when no tide buffers are left
+  (add-hook! 'tide-mode-hook
+    (add-hook 'kill-buffer-hook #'+javascript|cleanup-tide-processes nil t))
+
+  (def-menu! +javascript/refactor-menu
+    "Refactoring commands for `js2-mode' buffers."
+    '(("Restart tsserver"                :exec tide-restart-server   :when (bound-and-true-p tide-mode))
+      ("Reformat buffer/region (tide)"   :exec tide-reformat         :when (bound-and-true-p tide-mode))
+      ("Organize imports"                :exec tide-organize-imports :when (bound-and-true-p tide-mode))
+      ("Rename symbol"                   :exec tide-rename-symbol    :when (bound-and-true-p tide-mode) :region nil)
+      ("Reformat buffer (eslint_d)"      :exec eslintd-fix           :when (bound-and-true-p eslintd-fix-mode) :region nil)
+      ("Extract into function"           :exec js2r-extract-function          :region t)
+      ("Extract into method"             :exec js2r-extract-method            :region t)
+      ("Introduce parameter to function" :exec js2r-introduce-parameter       :region t)
+      ("Localize parameter"              :exec js2r-localize-parameter        :region nil)
+      ("Expand object"                   :exec js2r-expand-object             :region nil)
+      ("Expand function"                 :exec js2r-expand-function           :region nil)
+      ("Expand array"                    :exec js2r-expand-array              :region nil)
+      ("Contract object"                 :exec js2r-contract-object           :region nil)
+      ("Contract function"               :exec js2r-contract-function         :region nil)
+      ("Contract array"                  :exec js2r-contract-array            :region nil)
+      ("Wrap buffer in IIFE"             :exec js2r-wrap-buffer-in-iife       :region nil)
+      ("Inject global into IIFE"         :exec js2r-inject-global-in-iife     :region t)
+      ("Add to globals annotation"       :exec js2r-add-to-globals-annotation :region nil)
+      ("Extract variable"                :exec js2r-extract-var               :region t)
+      ("Inline variable"                 :exec js2r-inline-var                :region t)
+      ("Rename variable"                 :exec js2r-rename-var                :region nil)
+      ("Replace var with this"           :exec js2r-var-to-this               :region nil)
+      ("Arguments to object"             :exec js2r-arguments-to-object       :region nil)
+      ("Ternary to if"                   :exec js2r-ternary-to-if             :region nil)
+      ("Split var declaration"           :exec js2r-split-var-declaration     :region nil)
+      ("Split string"                    :exec js2r-split-string              :region nil)
+      ("Unwrap"                          :exec js2r-unwrap                    :region t)
+      ("Log this"                        :exec js2r-log-this)
+      ("Debug this"                      :exec js2r-debug-this))
+    :prompt "Refactor: ")
+
+  (map! :map tide-mode-map
+        :localleader
+        :n "r" #'+javascript/refactor-menu
+        :n "d" #'tide-jump-to-definition
+        :n "u" #'tide-references
+        :n "e" #'nodejs-repl
+        :n "h" #'tide-documentation-at-point))
 
 (use-package js2-refactor
   :commands
@@ -5886,40 +6019,11 @@ Gross
    js2r-split-var-declaration js2r-split-string js2r-unwrap js2r-log-this
    js2r-debug-this js2r-forward-slurp js2r-forward-barf))
 
-(use-package tern
-  :commands tern-mode
-  :init (add-hook 'js2-mode-hook #'tern-mode))
-
-(use-package company-tern
-  :after tern
+(use-package eslintd-fix
+  :commands (eslintd-fix-mode eslintd-fix)
   :config
-  (add-hook! js2-mode (setq-local company-backends '(company-tern))))
-
-(use-package rjsx-mode
-  :commands rjsx-mode
-  :mode "\\.jsx$"
-  :mode "components/.+\\.js$"
-  :init
-  (defun +javascript-jsx-file-p ()
-    (and buffer-file-name
-         (equal (file-name-extension buffer-file-name) "js")
-         (re-search-forward "\\(^\\s-*import React\\|\\( from \\|require(\\)[\"']react\\)"
-                            magic-mode-regexp-match-limit t)
-         (progn (goto-char (match-beginning 1))
-                (not (sp-point-in-string-or-comment)))))
-
-  (push (cons #'+javascript-jsx-file-p 'rjsx-mode) magic-mode-alist)
-
-  :config
-  (add-hook! rjsx-mode
-    ;; jshint doesn't really know how to deal with jsx
-    (push 'javascript-jshint flycheck-disabled-checkers)))
-
-
-(use-package coffee-mode
-  :mode "\\.coffee$"
-  :init (setq coffee-indent-like-python-mode t))
-
+  (add-hook! 'eslintd-fix-mode-hook
+    (setq flycheck-javascript-eslint-executable eslintd-fix-executable)))
 
 (use-package web-beautify
   :commands web-beautify-js)
@@ -6493,39 +6597,6 @@ Get Scwhifty!
   :config
   (add-hook 'swift-mode-hook #'(lambda ()
                                  (setq-local company-backends '(company-sourcekit company-yasnippet)))))
-#+END_SRC
-
-*** Typescript
-
-#+BEGIN_SRC emacs-lisp
-(use-package typescript-mode
-  :mode "\\.ts$"
-  :init
-  (add-hook 'typescript-mode-hook #'rainbow-delimiters-mode))
-
-
-(use-package tide
-  :after typescript-mode
-  :config
-  (add-hook 'typescript-mode-hook #'(lambda ()
-                                      (setq-local company-backends '(company-tide))))
-
-  (setq tide-format-options
-        '(:insertSpaceAfterFunctionKeywordForAnonymousFunctions t
-          :placeOpenBraceOnNewLineForFunctions nil))
-
-  (defun +typescript|init-tide ()
-    (when (or (eq major-mode 'typescript-mode)
-              (and (eq major-mode 'web-mode)
-                   buffer-file-name
-                   (equal (file-name-extension buffer-file-name) "tsx")))
-      (tide-setup)
-      (flycheck-mode +1)
-      (eldoc-mode +1)
-      (setq tide-project-root (bmacs-project-root))))
-  (add-hook 'typescript-mode #'+typescript|init-tide)
-  (add-hook 'web-mode #'+typescript|init-tide))
-
 #+END_SRC
 
 *** Web
