@@ -59,8 +59,10 @@
     - [[#company][company]]
     - [[#comany-statistics][comany-statistics]]
     - [[#company-dict][company-dict]]
-  - [[#workspaces][Workspaces]]
+    - [[#company-box-disabled][company-box (disabled)]]
+  - [[#workspaces--projects][Workspaces / Projects]]
     - [[#persp-mode][persp-mode]]
+    - [[#projectile][projectile]]
   - [[#editing][Editing]]
     - [[#evil-1][evil]]
     - [[#hideshow][hideshow]]
@@ -92,7 +94,6 @@
     - [[#evil-goggles][evil-goggles]]
     - [[#hl-todo][hl-todo]]
     - [[#nav-flash][nav-flash]]
-    - [[#fringe-helper][fringe-helper]]
     - [[#highlight-indentation][highlight-indentation]]
     - [[#highlight-numbers][highlight-numbers]]
     - [[#hl-line][hl-line]]
@@ -100,8 +101,6 @@
     - [[#visual-fill-column][visual-fill-column]]
     - [[#nlinum-mode][nlinum-mode]]
     - [[#winner-mode][winner-mode]]
-  - [[#project][Project]]
-    - [[#projectile][projectile]]
   - [[#navigation][Navigation]]
     - [[#ace-link][ace-link]]
     - [[#ace-window][ace-window]]
@@ -1996,7 +1995,33 @@ Dictionary based completions in company
     :commands company-dict)
 #+END_SRC
 
-** Workspaces
+*** company-box (disabled)
+A company front-end with icons. Currently disabled because configuration seems pretty limited and I'm not currently sold on it. It doesn't show when there is only one candidate and the minimum height with only a few candidates is way too small.
+
+#+BEGIN_SRC emacs-lisp :tangle no
+(use-package company-box
+  :hook (company-mode . company-box-mode)
+  :init
+  (defun +company|fix-frontends ()
+    "Ensure `company-pseudo-tooltip-frontend' is *not* in `company-frontends'
+when company-box is active, which are incompatible and cause duplicate popups."
+    (make-variable-buffer-local 'company-frontends)
+    (if company-box-mode
+        (setq company-frontends (delq 'company-pseudo-tooltip-frontend company-frontends))
+      (cl-pushnew 'company-pseudo-tooltip-frontend company-frontends :test #'eq)))
+  (add-hook 'company-box-mode-hook #'+company|fix-frontends)
+  :config
+  (setq company-box-backends-colors nil
+        company-box-icons-elisp
+        (list (all-the-icons-material "functions" :face 'all-the-icons-purple)
+              (all-the-icons-material "check_circle" :face 'all-the-icons-blue)
+              (all-the-icons-material "stars" :face 'all-the-icons-yellow)
+              (all-the-icons-material "format_paint" :face 'all-the-icons-pink))
+        company-box-icons-unknown (all-the-icons-material "find_in_page" :face 'all-the-icons-silver)
+        company-box-icons-yasnippet (all-the-icons-material "short_text" :face 'all-the-icons-green)))
+#+END_SRC
+
+** Workspaces / Projects
 
 *** persp-mode
 Allows for creation of isolated workspaces
@@ -2059,6 +2084,43 @@ Allows for creation of isolated workspaces
   (add-hook 'bmacs-post-init-hook #'(lambda () (persp-mode 1))))
 #+END_SRC
 
+
+*** projectile
+Project support anywhere, for any project
+
+#+BEGIN_SRC emacs-lisp
+(use-package projectile
+  :demand t
+  :init
+  (setq projectile-cache-file (concat bmacs-cache-dir "projectile.cache")
+        projectile-enable-caching t
+        projectile-indexing-method 'alien
+        projectile-require-project-root nil
+        projectile-known-projects-file (concat bmacs-cache-dir "projectile.projects")
+        projectile-globally-ignored-files '(".DS_Store" "Icon" "TAGS")
+        projectile-globally-ignored-file-suffixes '(".elc" ".pyc" ".o" ".class"))
+
+  (add-hook 'bmacs-post-init-hook #'projectile-mode)
+  :config
+  ;; a more generic project root file
+  (push ".project" projectile-project-root-files-bottom-up)
+
+  (setq grep-find-ignored-directories '("target" ".ensime_cache" ".fingerprint"))
+  (nconc projectile-globally-ignored-directories '("target" ".ensime_cache" ".fingerprint" "project/target" "node_modules"))
+  (nconc projectile-other-file-alist '(("css"  . ("scss" "sass" "less" "style"))
+                                       ("scss" . ("css"))
+                                       ("sass" . ("css"))
+                                       ("less" . ("css"))
+                                       ("styl" . ("css"))))
+
+  ;; Projectile root-searching functions can cause an infinite loop on TRAMP
+  ;; connections, so disable them.
+  (defun bmacs--projectile-locate-dominating-file (orig-fn &rest args)
+    "Don't traverse the file system if on a remote connection."
+    (unless (file-remote-p default-directory)
+      (apply orig-fn args)))
+  (advice-add #'projectile-locate-dominating-file :around #'bmacs--projectile-locate-dominating-file))
+#+END_SRC
 
 ** Editing
 
@@ -2652,32 +2714,27 @@ Vi like tilde's in the fringe for past EOF
             (overlay-put
              ov 'display (propertize "  [...]  " 'face '+doom-folded-face))))))
 
+(unless (fboundp 'define-fringe-bitmap)
+  ;; doesn't exist in terminal Emacs; define it to prevent errors
+  (defun define-fringe-bitmap (&rest _)))
+
 (after! flycheck
   ;; because git-gutter is in the left fringe
   (setq flycheck-indication-mode 'right-fringe)
   ;; A non-descript, left-pointing arrow
-  (fringe-helper-define 'flycheck-fringe-bitmap-double-arrow 'center
-    "...X...."
-    "..XX...."
-    ".XXX...."
-    "XXXX...."
-    ".XXX...."
-    "..XX...."
-    "...X...."))
+  (define-fringe-bitmap 'flycheck-fringe-bitmap-double-arrow
+    [16 48 112 240 112 48 16] nil nil 'center))
 
 (after! git-gutter-fringe
   ;; places the git gutter outside the margins.
   (setq-default fringes-outside-margins t)
   ;; thin fringe bitmaps
-  (fringe-helper-define 'git-gutter-fr:added '(center repeated)
-    "XXX.....")
-  (fringe-helper-define 'git-gutter-fr:modified '(center repeated)
-    "XXX.....")
-  (fringe-helper-define 'git-gutter-fr:deleted 'bottom
-    "X......."
-    "XX......"
-    "XXX....."
-    "XXXX...."))
+  (define-fringe-bitmap 'git-gutter-fr:added [224]
+    nil nil '(center repeated))
+  (define-fringe-bitmap 'git-gutter-fr:modified [224]
+    nil nil '(center repeated))
+  (define-fringe-bitmap 'git-gutter-fr:deleted [128 192 224 240]
+    nil nil 'bottom))
 #+END_SRC
 
 *** doom-dashboard
@@ -3773,18 +3830,6 @@ for comment start/end characters."
 
 #+END_SRC
 
-*** fringe-helper
-Adds simple helper functions to define fringe bitmaps.
-
-#+BEGIN_SRC emacs-lisp
-(use-package fringe-helper
-  :commands (fringe-helper-define fringe-helper-convert)
-  :init
-  (unless (fboundp 'define-fringe-bitmap)
-    ;; doesn't exist in terminal Emacs; define it to prevent errors
-    (defun define-fringe-bitmap (&rest _))))
-#+END_SRC
-
 *** highlight-indentation
 Simply allows indentation to be visibly highlighted
 
@@ -3906,45 +3951,6 @@ Windowing operations (mostly undo/redo)
 (autoload 'winner-mode "winner" nil t)
 (add-hook 'bmacs-post-init-hook #'winner-mode)
 
-#+END_SRC
-
-** Project
-
-*** projectile
-Project support anywhere, for any project
-
-#+BEGIN_SRC emacs-lisp
-(use-package projectile
-  :demand t
-  :init
-  (setq projectile-cache-file (concat bmacs-cache-dir "projectile.cache")
-        projectile-enable-caching t
-        projectile-indexing-method 'alien
-        projectile-require-project-root nil
-        projectile-known-projects-file (concat bmacs-cache-dir "projectile.projects")
-        projectile-globally-ignored-files '(".DS_Store" "Icon" "TAGS")
-        projectile-globally-ignored-file-suffixes '(".elc" ".pyc" ".o" ".class"))
-
-  (add-hook 'bmacs-post-init-hook #'projectile-mode)
-  :config
-  ;; a more generic project root file
-  (push ".project" projectile-project-root-files-bottom-up)
-
-  (setq grep-find-ignored-directories '("target" ".ensime_cache" ".fingerprint"))
-  (nconc projectile-globally-ignored-directories '("target" ".ensime_cache" ".fingerprint" "project/target"))
-  (nconc projectile-other-file-alist '(("css"  . ("scss" "sass" "less" "style"))
-                                       ("scss" . ("css"))
-                                       ("sass" . ("css"))
-                                       ("less" . ("css"))
-                                       ("styl" . ("css"))))
-
-  ;; Projectile root-searching functions can cause an infinite loop on TRAMP
-  ;; connections, so disable them.
-  (defun bmacs--projectile-locate-dominating-file (orig-fn &rest args)
-    "Don't traverse the file system if on a remote connection."
-    (unless (file-remote-p default-directory)
-      (apply orig-fn args)))
-  (advice-add #'projectile-locate-dominating-file :around #'bmacs--projectile-locate-dominating-file))
 #+END_SRC
 
 ** Navigation
