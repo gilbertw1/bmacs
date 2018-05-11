@@ -174,6 +174,7 @@
     - [[#update-faces][Update Faces]]
     - [[#mardown-open-comamnd][Mardown Open Comamnd]]
     - [[#fix-org-popups][Fix Org Popups]]
+    - [[#start-profiling][Start profiling]]
 
 ** About this file
 
@@ -3829,7 +3830,6 @@ Flash the current line periodically to indicate current buffer position, especia
   :init
   (advice-add #'windmove-do-window-select :around #'bmacs*blink-cursor-maybe)
   (advice-add #'recenter :around #'bmacs*blink-cursor-maybe)
-  (advice-add #'save-place-find-file-hook :after #'bmacs/blink-cursor)
 
   (after! evil
     (advice-add #'evil--jumps-jump   :after #'bmacs/blink-cursor)
@@ -8203,4 +8203,12 @@ Set the various indentations
 (after! org
   (defun org-switch-to-buffer-other-window (&rest args)
     (apply #'switch-to-buffer-other-window args)))
+#+END_SRC
+
+
+*** Start profiling (debug)
+This is useful to debug slow startups. Off by default
+
+#+BEGIN_SRC emacs-lisp :tangle no
+(profiler-start 'cpu)
 #+END_SRC
