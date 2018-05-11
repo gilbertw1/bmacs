@@ -174,7 +174,7 @@
     - [[#update-faces][Update Faces]]
     - [[#mardown-open-comamnd][Mardown Open Comamnd]]
     - [[#fix-org-popups][Fix Org Popups]]
-    - [[#start-profiling][Start profiling]]
+    - [[#start-profiling-debug][Start profiling (debug)]]
 
 ** About this file
 
@@ -5973,21 +5973,22 @@ Gross
   :config
   (setq tide-completion-detailed t
         tide-always-show-documentation t)
+
   ;; code completion
   (after! company
     ;; tide affects the global `company-backends', undo this so doom can handle
     ;; it buffer-locally
     (setq-default company-backends (delq 'company-tide (default-value 'company-backends))))
 
-  (add-hook tide-mode-hook #'(lambda ()
+  (add-hook 'tide-mode-hook (lambda ()
                                 (setq-local company-backends '(company-tide))))
 
   ;; resolve to `doom-project-root' if `tide-project-root' fails
   (advice-add #'tide-project-root :override #'+javascript*tide-project-root)
 
   ;; cleanup tsserver when no tide buffers are left
-  (add-hook! 'tide-mode-hook
-    (add-hook 'kill-buffer-hook #'+javascript|cleanup-tide-processes nil t))
+  (add-hook 'tide-mode-hook (lambda ()
+                              (add-hook 'kill-buffer-hook #'+javascript|cleanup-tide-processes nil t)))
 
   (def-menu! +javascript/refactor-menu
     "Refactoring commands for `js2-mode' buffers."
@@ -6796,6 +6797,8 @@ Now we're going to create a set of rules based on the buffers we would like to b
 (bmacs/make-popup (rx bos "*Messages*" eos))
 ;; Backtrace
 (bmacs/make-popup (rx bos "*Backtrace*" eos))
+;; Warnings
+(bmacs/make-popup (rx bos "*Warnings*" eos))
 ;; Compilation
 (bmacs/make-popup (rx bos "*compilation*" eos))
 ;; Pretty Print Eval Output
