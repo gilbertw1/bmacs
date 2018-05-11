@@ -1831,6 +1831,10 @@ Making everything all ivy-ed up.
   (require 'counsel-projectile)
   (setq counsel-find-file-ignore-regexp "\\(?:^[#.]\\)\\|\\(?:[#~]$\\)\\|\\(?:^Icon?\\)")
 
+  ;; Set evil jump point before search
+  (advice-add #'counsel-ag-function :before (lambda (arg)
+                                              (evil--jumps-push)))
+
   ;; Add action to open in other window during search
   (dolist (cmd '(counsel-ag counsel-rg counsel-pt))
     (ivy-add-actions
@@ -3792,6 +3796,9 @@ for comment start/end characters."
 #+END_SRC
 
 *** nav-flash
+Flash the current line periodically to indicate current buffer position, especially after large movements.
+
+**** Functions
 
 #+BEGIN_SRC emacs-lisp
 (defun bmacs*blink-cursor-maybe (orig-fn &rest args)
@@ -3805,7 +3812,6 @@ for comment start/end characters."
                                        (point-marker))))
       (bmacs/blink-cursor))))
 
-;;;###autoload
 (defun bmacs/blink-cursor (&rest _)
   "Blink current line using `nav-flash'."
   (interactive)
@@ -3813,14 +3819,17 @@ for comment start/end characters."
     (nav-flash-show)
     ;; only show in the current window
     (overlay-put compilation-highlight-overlay 'window (selected-window))))
+#+END_SRC
 
+**** Config
+
+#+BEGIN_SRC emacs-lisp
 (use-package nav-flash
   :commands nav-flash-show
   :init
-  ;; NOTE In :feature jump `recenter' is hooked to a bunch of jumping commands,
-  ;; which will trigger nav-flash.
   (advice-add #'windmove-do-window-select :around #'bmacs*blink-cursor-maybe)
   (advice-add #'recenter :around #'bmacs*blink-cursor-maybe)
+  (advice-add #'save-place-find-file-hook :after #'bmacs/blink-cursor)
 
   (after! evil
     (advice-add #'evil--jumps-jump   :after #'bmacs/blink-cursor)
@@ -4009,21 +4018,9 @@ Edit grep buffer and save changes
 *** dumb-jump
 Jump to any definition ... the dumb way!
 
+**** Functions
+
 #+BEGIN_SRC emacs-lisp
-(use-package dumb-jump
-  :commands (dumb-jump-go dumb-jump-quick-look dumb-jump-go-other-window
-             dumb-jump-back dumb-jump-result-follow)
-  :config
-  (setq dumb-jump-default-project bmacs-emacs-dir
-        dumb-jump-aggressive nil
-        dumb-jump-use-visible-window nil
-        dumb-jump-selector 'ivy))
-
-(add-hook!
-  '(imenu-after-jump-hook evil-jumps-post-jump-hook
-    counsel-grep-post-action-hook dumb-jump-after-jump-hook)
-  #'recenter)
-
 (defun bmacs/jump-definition (&optional other-window)
   "Jump to the definition of the symbol at point using `dumb-jump'"
   (interactive)
@@ -4035,6 +4032,25 @@ Jump to any definition ... the dumb way!
 (defun bmacs/jump-definition-other-window ()
   (interactive)
   (bmacs/jump-definition t))
+#+END_SRC
+
+**** Config
+
+#+BEGIN_SRC emacs-lisp
+(use-package dumb-jump
+  :commands (dumb-jump-go dumb-jump-quick-look dumb-jump-go-other-window
+             dumb-jump-back dumb-jump-result-follow)
+  :config
+  (setq dumb-jump-default-project bmacs-emacs-dir
+        dumb-jump-aggressive nil
+        dumb-jump-use-visible-window nil
+        dumb-jump-selector 'ivy))
+
+;; Perform recenter after various jumps
+(add-hook!
+  '(imenu-after-jump-hook evil-jumps-post-jump-hook
+    counsel-grep-post-action-hook dumb-jump-after-jump-hook)
+  #'recenter)
 #+END_SRC
 
 ** Org Mode (Needs Cleaning)
@@ -7913,7 +7929,6 @@ session)."
      "C-j" nil
      "C-k" nil
      :n "RET" #'+borg/dwim-at-point
-     :i "RET" #'evil-ret
      ;; Navigate table cells
      :i  "M-l"   #'+borg/table-next-field
      :i  "M-h"   #'+borg/table-previous-field
