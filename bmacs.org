@@ -74,6 +74,7 @@
     - [[#yasnippet-snippets][yasnippet-snippets]]
     - [[#auto-yasnippet][auto-yasnippet]]
     - [[#flycheck][flycheck]]
+    - [[#dtrt-indent-mode][dtrt-indent-mode]]
   - [[#git][Git]]
     - [[#magit][Magit]]
     - [[#gitconfig-mode][gitconfig-mode]]
@@ -1802,6 +1803,7 @@ Making everything all ivy-ed up.
 
 #+BEGIN_SRC emacs-lisp
 (use-package counsel-projectile
+  :demand t
   :after counsel
   :config
   (defun +ivy-projectile-find-file-transformer (str)
@@ -1872,6 +1874,7 @@ Provide more information in ivy buffers list.
 
 #+BEGIN_SRC emacs-lisp
 (use-package ivy-rich
+  :demand t
   :after ivy
   :config
   (dolist (cmd '(ivy-switch-buffer counsel-projectile-switch-to-buffer))
@@ -1897,6 +1900,7 @@ Nice ivy hydra
 
 #+BEGIN_SRC emacs-lisp
   (use-package ivy-hydra
+    :demand t
     :after ivy
     :commands (+ivy@coo/body ivy-dispatching-done-hydra)
     :init
@@ -1986,6 +1990,7 @@ Keep company completion statistics to improve sorting
 
 #+BEGIN_SRC emacs-lisp
 (use-package company-statistics
+  :demand t
   :after company
   :config
   (setq company-statistics-file (concat bmacs-cache-dir "company-stats-cache.el"))
@@ -2145,6 +2150,7 @@ I like to move it move it
 
 #+BEGIN_SRC emacs-lisp
 (use-package evil-easymotion
+  :demand t
   :after evil-snipe
   :commands evilem-create
   :config
@@ -2306,6 +2312,7 @@ Treat arguments as text objects using 'a'
 
 #+BEGIN_SRC emacs-lisp
 (use-package evil-args
+  :demand t
   :after evil
   :commands (evil-inner-arg evil-outer-arg
              evil-forward-arg evil-backward-arg
@@ -2329,6 +2336,7 @@ Treat simple code blocks as text objects using 'b'
 
 #+BEGIN_SRC emacs-lisp
 (use-package goto-chg
+  :demand t
   :after evil)
 #+END_SRC
 
@@ -2483,6 +2491,7 @@ buggy behavior when <delete> is pressed in an empty field."
 
 #+BEGIN_SRC emacs-lisp
 (use-package yasnippet-snippets
+  :demand t
   :after yasnippet)
 #+END_SRC
 
@@ -2509,11 +2518,23 @@ Check syntax!
 
 
 (use-package flycheck-pos-tip
+  :demand t
   :after flycheck
   :config
   (setq flycheck-pos-tip-timeout 10
         flycheck-display-errors-delay 0.5)
   (flycheck-pos-tip-mode +1))
+#+END_SRC
+
+*** dtrt-indent-mode
+Automatically detect and set indentation in programming modes
+
+#+BEGIN_SRC emacs-lisp
+(use-package dtrt-indent
+  :demand t
+  :config
+  (add-to-list 'dtrt-indent-hook-mapping-list '(scala-mode c/c++/java scala-indent:step))
+  (add-hook! 'prog-mode-hook #'dtrt-indent-mode))
 #+END_SRC
 
 ** Git
@@ -2616,6 +2637,7 @@ repository root."
 
 #+BEGIN_SRC emacs-lisp
 (use-package evil-magit
+  :demand t
   :after magit
   :init (setq evil-magit-want-horizontal-movement t))
 #+END_SRC
@@ -3936,6 +3958,7 @@ If we're not using Emacs 26+ we need nlinum to support line numbers.
     (add-hook 'nlinum-mode-hook #'bmacs|init-nlinum-width))
 
   (use-package nlinum-hl
+    :demand t
     :after nlinum
     :config
     ;; With `markdown-fontify-code-blocks-natively' enabled in `markdown-mode',
@@ -4418,6 +4441,9 @@ FUN function callback"
 
 (+borg/org-load-hook #'+borg|init)
 (add-hook 'org-mode-hook #'+borg|hook)
+
+;; Disable auto pair ' in elisp mode
+(sp-local-pair 'org-mode "'" nil :actions nil)
 #+END_SRC
 
 *** Babel
@@ -4782,6 +4808,7 @@ Configuration
 
 
   (use-package mu4e-maildirs-extension
+               :demand t
                :after mu4e
                :config (mu4e-maildirs-extension))
 
@@ -4904,6 +4931,7 @@ Configuration
 
 
 (use-package company-restclient
+  :demand t
   :after restclient
   :config
   (add-hook! restclient-mode (setq-local company-backends (cons 'company-restclient company-backends))))
@@ -4959,6 +4987,7 @@ Directories in Emacs
         :n "r" #'dired-do-rename))
 
 (use-package dired-k
+  :demand t
   :after dired
   :config
   (setq dired-k-style 'git)
@@ -5450,6 +5479,7 @@ Can you hear the C? -- TODO: Pair this down to just basic C/C++ support ... too 
 
 
   (use-package irony
+    :demand t
     :after cc-mode
     :commands irony-install-server
     :preface
@@ -5461,10 +5491,12 @@ Can you hear the C? -- TODO: Pair this down to just basic C/C++ support ... too 
       (warn "irony-mode: server isn't installed; run M-x irony-install-server")))
 
   (use-package irony-eldoc
+    :demand t
     :after irony
     :config (add-hook 'irony-mode-hook #'irony-eldoc))
 
   (use-package flycheck-irony
+    :demand t
     :after irony
     :config
     (add-hook 'irony-mode-hook #'flycheck-mode)
@@ -5506,11 +5538,16 @@ Can you hear the C? -- TODO: Pair this down to just basic C/C++ support ... too 
   ;; Plugins
   ;;
 
-  (use-package company-irony :after irony)
+  (use-package company-irony
+    :demand t
+    :after irony)
 
-  (use-package company-irony-c-headers :after company-irony)
+  (use-package company-irony-c-headers
+    :demand t
+    :after company-irony)
 
   (use-package company-glsl
+    :demand t
     :after glsl-mode)
     ;; :config
     ;; (if (executable-find "glslangValidator")
@@ -5538,6 +5575,7 @@ Java, but Microsoft
 (use-package csharp-mode :mode "\\.cs$")
 
 (use-package omnisharp
+  :demand t
   :after csharp-mode
   :preface
   (setq omnisharp-auto-complete-want-documentation nil
@@ -5641,6 +5679,7 @@ Reactive javascriptish like?
 
 
 (use-package flycheck-elm
+  :demand t
   :after elm-mode
   :config
   (add-hook 'flycheck-mode-hook #'flycheck-elm-setup))
@@ -5751,6 +5790,7 @@ Go by Google
       (add-hook go-mode #'(add-hook 'before-save-hook #'gofmt-before-save nil t))))
 
   (use-package go-eldoc
+    :demand t
     :after go-mode
     :commands go-eldoc-setup
     :config (add-hook 'go-mode-hook #'go-eldoc-setup))
@@ -5772,6 +5812,7 @@ Go by Google
 
   (use-package company-go
     :init (setq command-go-gocode-command "gocode")
+    :demand t
     :after go-mode)
     ;; :config
     ;; (if (executable-find command-go-gocode-command)
@@ -5811,6 +5852,7 @@ Lazy lazy functional programming
   :commands (structured-haskell-mode))
 
 (use-package dante
+  :demand t
   :after haskell-mode
   :init
   (add-hook 'haskell-mode-hook #'(dante-mode interactive-haskell-mode))
@@ -5822,6 +5864,7 @@ Lazy lazy functional programming
   (add-hook 'dante-mode-hook #'flycheck-mode))
 
 (use-package company-ghc
+  :demand t
   :after haskell-mode
   :init
   (add-hook 'haskell-mode-hook #'ghc-comp-init)
@@ -6097,6 +6140,7 @@ Math stuff.
   (setq sp-pairs (delete (assq 'lua-mode sp-pairs) sp-pairs)))
 
 (use-package company-lua
+  :demand t
   :after lua-mode)
 
 (use-package moonscript
@@ -6167,6 +6211,7 @@ OCaml ... He doesn't scare me at all
   :mode ("\\.ml[4ilpy]?$" . tuareg-mode))
 
 (use-package merlin
+  :demand t
   :after tuareg
   :config
   (add-hook 'tuareg-mode-hook #'merlin-mode))
@@ -6182,6 +6227,7 @@ Is perl still a thing?
 ;  :init (require 'perl6-detect))
 
 (use-package flycheck-perl6
+  :demand t
   :after perl6-mode
   :config (add-hook 'perl6-mode-hook #'flycheck-mode))
 #+END_SRC
@@ -6259,6 +6305,7 @@ Simple uml syntax
     (warn "plantuml-mode: can't find plantuml.jar; run M-x +plantuml/install.")))
 
 (use-package flycheck-plantuml
+  :demand t
   :after plantuml-mode
   :config (flycheck-plantuml-setup))
 #+END_SRC
@@ -6283,6 +6330,7 @@ Play framework routes support
   (load "purescript-mode-autoloads" nil t))
 
 (use-package psc-ide
+  :demand t
   :after purescript-mode
   :config
   (add-hook 'purescript-mode-hook #'psc-ide-mode))
@@ -6361,6 +6409,7 @@ environment variables."
 
 
 (use-package anaconda-mode
+  :demand t
   :after python
   :init
   (add-hook 'python-mode-hook #'anaconda-mode)
@@ -6369,6 +6418,7 @@ environment variables."
         anaconda-mode-eldoc-as-single-line t))
 
 (use-package company-anaconda
+  :demand t
   :after anaconda-mode
   :config
   (map! :map python-mode-map
@@ -6455,6 +6505,7 @@ The future!
     :prompt "Cargo: "))
 
 (use-package racer
+  :demand t
   :after rust-mode
   :preface
   :init
@@ -6470,12 +6521,14 @@ The future!
     (warn "rust-mode: racer binary can't be found; auto-completion is disabled")))
 
 (use-package company-racer
+  :demand t
   :after racer
   :config
   (add-hook 'rust-mode-hook #'(lambda ()
                                 (setq-local company-backends '(company-racer)))))
 
 (use-package flycheck-rust
+  :demand t
   :after rust-mode
   :config (add-hook 'rust-mode-hook #'flycheck-mode))
 #+END_SRC
@@ -6499,9 +6552,12 @@ The best the JVM's got to offer
         :desc "Goto next error"          :n "e" #'next-error
         :desc "Show errors at point"     :n "E" #'ensime-print-errors-at-point))
 
-(use-package sbt-mode :after scala-mode)
+(use-package sbt-mode
+  :demand t
+  :after scala-mode)
 
 (use-package ensime
+  :demand t
   :after scala-mode
   :config
   (add-hook 'scala-mode #'(lambda ()
@@ -6595,6 +6651,7 @@ Ghetto shell scripting
 
 
 (use-package company-shell
+  :demand t
   :after sh-script
   :config
   (add-hook 'sh-mode-hook #'(lambda ()
@@ -6616,6 +6673,7 @@ Get Scwhifty!
   (cl-pushnew 'swift flycheck-checkers))
 
 (use-package company-sourcekit
+  :demand t
   :after swift-mode
   :config
   (add-hook 'swift-mode-hook #'(lambda ()
@@ -6689,6 +6747,7 @@ Get Scwhifty!
         :nv "[T"  #'web-mode-element-parent))
 
 (use-package company-web
+  :demand t
   :after web-mode)
 
 (use-package haml-mode :mode "\\.haml$")
