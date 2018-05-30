@@ -56,6 +56,7 @@
     - [[#smex][smex]]
     - [[#ivy-rich][ivy-rich]]
     - [[#ivy-hydra][ivy-hydra]]
+    - [[#ivy-posframe][ivy-posframe]]
     - [[#company][company]]
     - [[#comany-statistics][comany-statistics]]
     - [[#company-dict][company-dict]]
@@ -1947,6 +1948,58 @@ Nice ivy hydra
       ("t" (setq truncate-lines (not truncate-lines)))
       ("C" ivy-toggle-case-fold)
       ("o" ivy-occur :exit t)))
+#+END_SRC
+
+*** ivy-posframe
+
+**** functions
+
+#+BEGIN_SRC emacs-lisp
+(defun +ivy-display-at-frame-center-near-bottom (str)
+  "TODO"
+  (ivy-posframe--display str #'+ivy-poshandler-frame-center-near-bottom))
+
+(defun +ivy-poshandler-frame-center-near-bottom (info)
+  "TODO"
+  (let ((parent-frame (plist-get info :parent-frame))
+        (pos (posframe-poshandler-frame-center info)))
+    (cons (car pos)
+          (truncate (/ (frame-pixel-height parent-frame) 1.6)))))
+#+END_SRC
+
+**** config
+
+#+BEGIN_SRC emacs-lisp
+(use-package ivy-posframe
+  :hook (ivy-mode . ivy-posframe-enable)
+  :preface
+  ;; This function searches the entire `obarray' just to populate
+  ;; `ivy-display-functions-props'. There are 15k entries in mine! This is
+  ;; wasteful, so...
+  (advice-add #'ivy-posframe-setup :override #'ignore)
+  :config
+  (setq ivy-height 16
+        ivy-fixed-height-minibuffer nil
+        ivy-posframe-parameters `((min-width . 90)
+                                  (min-height . ,ivy-height)
+                                  (internal-border-width . 10)))
+
+  ;; ... let's do it manually
+  (dolist (fn (list 'ivy-posframe-display-at-frame-bottom-left
+                    'ivy-posframe-display-at-frame-center
+                    'ivy-posframe-display-at-point
+                    'ivy-posframe-display-at-frame-bottom-window-center
+                    'ivy-posframe-display
+                    'ivy-posframe-display-at-window-bottom-left
+                    'ivy-posframe-display-at-window-center
+                    '+ivy-display-at-frame-center-near-bottom))
+    (map-put ivy-display-functions-props fn '(:cleanup ivy-posframe-cleanup)))
+
+  (map-put ivy-display-functions-alist 't '+ivy-display-at-frame-center-near-bottom)
+
+  ;; posframe doesn't work well with async sources
+  (dolist (fn '(swiper counsel-rg counsel-ag counsel-pt counsel-grep counsel-git-grep))
+    (map-put ivy-display-functions-alist fn nil)))
 #+END_SRC
 
 *** company
