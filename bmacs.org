@@ -13,6 +13,7 @@
   - [[#personal-information][Personal Information]]
   - [[#variables][Variables]]
     - [[#font][Font]]
+    - [[#theme][Theme]]
     - [[#leader-keys][Leader Keys]]
     - [[#directories][Directories]]
     - [[#hooks][Hooks]]
@@ -31,6 +32,7 @@
     - [[#def-memoized][def-memoized!]]
     - [[#λ][λ!]]
     - [[#def-menu][def-menu!]]
+  - [[#use-package-modifications][Use Package Modifications]]
   - [[#helper-functions][Helper Functions]]
   - [[#core-settings][Core Settings]]
     - [[#charset][Charset]]
@@ -51,8 +53,8 @@
     - [[#evil][evil]]
     - [[#recentf][recentf]]
   - [[#completion][Completion]]
-    - [[#swiper][Swiper]]
-    - [[#counsel][Counsel]]
+    - [[#swiper][swiper]]
+    - [[#counsel][counsel]]
     - [[#smex][smex]]
     - [[#ivy-rich][ivy-rich]]
     - [[#ivy-hydra][ivy-hydra]]
@@ -87,6 +89,7 @@
     - [[#evil-magit][evil-magit]]
     - [[#smerge][smerge]]
   - [[#ui-1][UI]]
+    - [[#general][general]]
     - [[#all-the-icons][all-the-icons]]
     - [[#vi-tilde-fringe][vi-tilde-fringe]]
     - [[#doom-themes][doom-themes]]
@@ -197,6 +200,12 @@ This is Bryan Gilbert's personal Emacs configuration.
 (defvar bmacs-font (font-spec :family "Iosevka" :size 25))
 #+END_SRC
 
+*** Theme
+
+#+BEGIN_SRC emacs-lisp
+(defvar doom-theme 'doom-one)
+#+END_SRC
+
 *** Leader Keys
 
 Define the leader and local leader keys. These are the basis of most custom global and mode specific
@@ -262,6 +271,13 @@ different types of files.
 trigger `bmacs/escape'.
 
 If any hook returns non-nil, all hooks after it are ignored.")
+
+(defvar bmacs-init-ui-hook nil
+  "List of hooks to run when the UI has been initialized.")
+
+(defvar bmacs-load-theme-hook nil
+  "Hook run when the theme (and font) is initialized (or reloaded
+with `doom//reload-theme').")
 
 #+END_SRC
 
@@ -847,7 +863,7 @@ PROMPT (a string) and COMMAND (a list of command plists; see `def-menu!').")
     (let ((command (plist-get plist :exec))
           (cwd     (plist-get plist :cwd)))
       (let ((default-directory
-              (cond ((eq cwd t) (doom-project-root))
+              (cond ((eq cwd t) (bmacs-project-root))
                     ((stringp cwd) cwd)
                     ((functionp cwd) (funcall cwd))
                     (t default-directory))))
@@ -939,6 +955,60 @@ lisp form.
           (cdr (or (when arg doom-menu-last-command)
                    (setq doom-menu-last-command command)
                    (user-error "No command selected"))))))))
+#+END_SRC
+
+** Use Package Modifications
+
+#+BEGIN_SRC emacs-lisp
+(eval-and-compile
+;;
+;; Use-package modifications
+;;
+
+(autoload 'use-package "use-package-core" nil nil t)
+
+;; Adds the :after-call custom keyword to `use-package' (and consequently,
+;; `def-package!'). :after-call takes a symbol ro list of symbols. These symbols
+;; can be functions to hook variables.
+;;
+;;   (use-package X :after-call find-file-hook)
+;;
+;; This will load X on the first invokation of `find-file-hook' (then it will
+;; remove itself from the hook).
+(defvar doom--deferred-packages-alist ())
+(after! use-package-core
+  (add-to-list 'use-package-deferring-keywords :after-call nil #'eq)
+
+  (setq use-package-keywords
+        (use-package-list-insert :after-call use-package-keywords :after))
+
+  (defalias 'use-package-normalize/:after-call
+    'use-package-normalize-symlist)
+
+  (defun use-package-handler/:after-call (name-symbol _keyword hooks rest state)
+    (let ((fn (intern (format "doom|transient-hook--load-%s" name-symbol)))
+          (hooks (delete-dups hooks)))
+      (if (plist-get state :demand)
+          (use-package-process-keywords name rest state)
+        (use-package-concat
+         `((fset ',fn
+                 (lambda (&rest _)
+                   (require ',name-symbol)
+                   (dolist (hook (cdr (assq ',name-symbol doom--deferred-packages-alist)))
+                     (if (functionp hook)
+                         (advice-remove hook #',fn)
+                       (remove-hook hook #',fn)))
+                   (map-delete doom--deferred-packages-alist ',name-symbol)
+                   (fmakunbound ',fn))))
+         (cl-mapcan (lambda (hook)
+                      (if (functionp hook)
+                          `((advice-add #',hook :before #',fn))
+                        `((add-hook ',hook #',fn))))
+                    hooks)
+         `((map-put doom--deferred-packages-alist
+                    ',name-symbol
+                    '(,@hooks ,@(cdr (assq name-symbol doom--deferred-packages-alist)))))
+         (use-package-process-keywords name rest state)))))))
 #+END_SRC
 
 ** Helper Functions
@@ -1072,6 +1142,9 @@ From http://www.wisdomandwonder.com/wp-content/uploads/2014/03/C3F.html:
 **** Various Settings
 
 #+BEGIN_SRC emacs-lisp
+;; simple name in frame title
+(setq frame-title-format '("%b – BMACS"))
+
 (setq-default
   bidi-display-reordering nil         ; disable bidirectional text for tiny performance boost
   blink-matching-paren nil            ; don't blink--too distracting
@@ -1141,6 +1214,49 @@ Enable line numbers
 (add-hook 'prog-mode-hook #'bmacs|enable-line-numbers)
 (add-hook 'text-mode-hook #'bmacs|enable-line-numbers)
 (add-hook 'conf-mode-hook #'bmacs|enable-line-numbers)
+#+END_SRC
+
+**** Childframes
+
+#+BEGIN_SRC emacs-lisp
+(defun bmacs*fix-whitespace-mode-in-childframes (orig-fn &rest args)
+  (let ((frame (apply orig-fn args)))
+    (with-selected-frame frame
+      (setq-local whitespace-style nil)
+      frame)))
+(advice-add #'company-box--make-frame :around #'bmacs*fix-whitespace-mode-in-childframes)
+(advice-add #'posframe--create-posframe :around #'bmacs*fix-whitespace-mode-in-childframes)
+
+;; ensure posframe cleans up after itself
+(after! posframe
+  ;; TODO Find a better place for this
+  (defun bmacs|delete-posframe-on-escape ()
+    (unless (frame-parameter (selected-frame) 'posframe-buffer)
+      (cl-loop for frame in (frame-list)
+               if (and (frame-parameter frame 'posframe-buffer)
+                       (not (frame-visible-p frame)))
+               do (delete-frame frame))
+      (dolist (buffer (buffer-list))
+        (let ((frame (buffer-local-value 'posframe--frame buffer)))
+          (when (and frame (or (not (frame-live-p frame))
+                               (not (frame-visible-p frame))))
+            (posframe--kill-buffer buffer))))))
+  (add-hook 'bmacs-escape-hook #'bmacs|delete-posframe-on-escape))
+#+END_SRC
+
+**** Hide Fringes
+
+#+BEGIN_SRC emacs-lisp
+(defun bmacs|no-fringes-in-minibuffer (&rest _)
+  "Disable fringes in the minibuffer window."
+  (set-window-fringes (minibuffer-window) 0 0 nil))
+(add-hook! '(bmacs-init-ui-hook minibuffer-setup-hook window-configuration-change-hook)
+  #'bmacs|no-fringes-in-minibuffer)
+
+(defun bmacs|no-fringes-in-which-key-buffer (&rest _)
+  (bmacs|no-fringes-in-minibuffer)
+  (set-window-fringes (get-buffer-window which-key--buffer) 0 0 nil))
+(advice-add 'which-key--show-buffer-side-window :after #'bmacs|no-fringes-in-which-key-buffer)
 #+END_SRC
 
 *** Editor
@@ -1294,8 +1410,8 @@ Displays various "are you sure" messages when exiting emacs.
 (defun doom-quit-p (&optional prompt)
   "Return t if this session should be killed. Prompts the user for
 confirmation."
-(or (yes-or-no-p (format "››› %s" (or prompt "Quit Emacs?")))
-    (ignore (message "Aborted"))))
+  (or (yes-or-no-p (format "››› %s" (or prompt "Quit Emacs?")))
+      (ignore (message "Aborted"))))
 (setq confirm-kill-emacs nil)
 (add-hook 'kill-emacs-query-functions #'doom-quit-p)
 #+END_SRC
@@ -1305,6 +1421,9 @@ confirmation."
 Various settings of varying importance.
 
 #+BEGIN_SRC emacs-lisp
+(eval-when-compile
+  (setq ad-redefinition-action 'accept))
+
 (setq-default
  ad-redefinition-action 'accept          ; silence advised function warnings
  apropos-do-all t                        ; make `apropos' more useful
@@ -1448,34 +1567,29 @@ They power and the glory! Generic complete anything frontend
 
 #+BEGIN_SRC emacs-lisp
 (use-package ivy
-  :demand t
-  :init
-  (add-hook 'bmacs-post-init-hook #'ivy-mode)
+  :after-call pre-command-hook
   :config
-  (setq ivy-height 12                                  ; slightly longer ivy completions list
+  (setq ivy-height 15                                  ; slightly longer ivy completions list
         ivy-wrap t                                     ; wrap around at end of completions list
         ivy-fixed-height-minibuffer t                  ; use consistent height for ivy
         projectile-completion-system 'ivy              ; use ivy for projectile
         smex-completion-method 'ivy                    ; use ivy for smex
         ivy-initial-inputs-alist nil                   ; don't use ^ as initial input
         ivy-format-function #'ivy-format-function-line ; highlight til EOL
+        ivy-use-virtual-buffers nil                    ; dont' show recent files in switch-buffer
+        ivy-virtual-abbreviate 'full                   ; show full path if showing virtual buffer
         ivy-magic-slash-non-match-action nil           ; disable magic slash on non-match
+        ivy-on-del-error-function nil                  ; don't quit minibuffer on delete-error
         ivy-use-selectable-prompt t)                   ; allow input prompt value to be selectable
 
   (map! [remap switch-to-buffer]       #'ivy-switch-buffer
         [remap persp-switch-to-buffer] #'counsel-projectile-switch-to-buffer
         [remap imenu-anywhere]         #'ivy-imenu-anywhere)
 
-  ;; Don't sort persp mode related lists
-  (nconc ivy-sort-functions-alist
-         '((persp-kill-buffer   . nil)
-           (persp-remove-buffer . nil)
-           (persp-add-buffer    . nil)
-           (persp-switch        . nil)
-           (persp-window-switch . nil)
-           (persp-frame-switch  . nil)
-           (+workspace/switch-to . nil)
-           (+workspace/delete . nil))))
+  (after! magit     (setq magit-completing-read-function #'ivy-completing-read))
+  (after! yasnippet (add-to-list 'yas-prompt-functions #'+ivy-yas-prompt nil #'eq))
+
+  (ivy-mode +1))
 #+END_SRC
 
 *** evil
@@ -1485,64 +1599,64 @@ Like vim but better.
 **** Functions
 
 #+BEGIN_SRC emacs-lisp
-  (defvar +evil--flag nil)
+(defvar +evil--flag nil)
 
-  (defun +evil--ex-match-init (name &optional face update-hook)
-    (with-current-buffer evil-ex-current-buffer
-      (cond
-       ((eq +evil--flag 'start)
-        (evil-ex-make-hl name
-          :face (or face 'evil-ex-substitute-matches)
-          :update-hook (or update-hook #'evil-ex-pattern-update-ex-info))
-        (setq +evil--flag 'update))
+(defun +evil--ex-match-init (name &optional face update-hook)
+  (with-current-buffer evil-ex-current-buffer
+    (cond
+     ((eq +evil--flag 'start)
+      (evil-ex-make-hl name
+        :face (or face 'evil-ex-substitute-matches)
+        :update-hook (or update-hook #'evil-ex-pattern-update-ex-info))
+      (setq +evil--flag 'update))
 
-       ((eq +evil--flag 'stop)
-        (evil-ex-delete-hl name)))))
+     ((eq +evil--flag 'stop)
+      (evil-ex-delete-hl name)))))
 
-  (defun +evil--ex-buffer-match (arg &optional hl-name flags beg end)
-    (when (and (eq +evil--flag 'update)
-               evil-ex-substitute-highlight-all
-               (not (zerop (length arg))))
-      (condition-case lossage
-          (let ((pattern (evil-ex-make-substitute-pattern
-                          (if evil-ex-bang (regexp-quote arg) arg)
-                          (or flags (list))))
-                (range (or (evil-copy-range evil-ex-range)
-                           (evil-range (or beg (line-beginning-position))
-                                       (or end (line-end-position))
-                                       'line
-                                       :expanded t))))
-            (evil-expand-range range)
-            (evil-ex-hl-set-region hl-name
-                                   (max (evil-range-beginning range) (window-start))
-                                   (min (evil-range-end range) (window-end)))
-            (evil-ex-hl-change hl-name pattern))
-        (end-of-file
-         (evil-ex-pattern-update-ex-info nil "incomplete replacement"))
-        (user-error
-         (evil-ex-pattern-update-ex-info nil (format "?%s" lossage))))))
+(defun +evil--ex-buffer-match (arg &optional hl-name flags beg end)
+  (when (and (eq +evil--flag 'update)
+             evil-ex-substitute-highlight-all
+             (not (zerop (length arg))))
+    (condition-case lossage
+        (let ((pattern (evil-ex-make-substitute-pattern
+                        arg
+                        (or flags (list))))
+              (range (or (evil-copy-range evil-ex-range)
+                         (evil-range (or beg (line-beginning-position))
+                                     (or end (line-end-position))
+                                     'line
+                                     :expanded t))))
+          (evil-expand-range range)
+          (evil-ex-hl-set-region hl-name
+                                 (max (evil-range-beginning range) (window-start))
+                                 (min (evil-range-end range) (window-end)))
+          (evil-ex-hl-change hl-name pattern))
+      (end-of-file
+       (evil-ex-pattern-update-ex-info nil "incomplete replacement"))
+      (user-error
+       (evil-ex-pattern-update-ex-info nil (format "?%s" lossage))))))
 
-  (defun +evil-ex-buffer-match (flag &optional arg)
-    (let ((hl-name 'evil-ex-buffer-match)
-          (+evil--flag flag))
-      (with-selected-window (minibuffer-selected-window)
-        (+evil--ex-match-init hl-name)
-        (+evil--ex-buffer-match arg hl-name (list (if evil-ex-substitute-global ?g))))))
+(defun +evil-ex-buffer-match (flag &optional arg)
+  (let ((hl-name 'evil-ex-buffer-match)
+        (+evil--flag flag))
+    (with-selected-window (minibuffer-selected-window)
+      (+evil--ex-match-init hl-name)
+      (+evil--ex-buffer-match arg hl-name (list (if evil-ex-substitute-global ?g))))))
 
-  (defun +evil-ex-global-match (flag &optional arg)
-    (let ((hl-name 'evil-ex-global-match)
-          (+evil--flag flag))
-      (with-selected-window (minibuffer-selected-window)
-        (+evil--ex-match-init hl-name)
-        (+evil--ex-buffer-match arg hl-name nil (point-min) (point-max)))))
+(defun +evil-ex-global-match (flag &optional arg)
+  (let ((hl-name 'evil-ex-global-match)
+        (+evil--flag flag))
+    (with-selected-window (minibuffer-selected-window)
+      (+evil--ex-match-init hl-name)
+      (+evil--ex-buffer-match arg hl-name nil (point-min) (point-max)))))
 
-  (defun +evil-ex-global-delim-match (flag &optional arg)
-    (let ((hl-name 'evil-ex-global-delim-match)
-          (+evil--flag flag))
-      (with-selected-window (minibuffer-selected-window)
-        (+evil--ex-match-init hl-name)
-        (let ((result (car-safe (evil-delimited-arguments arg 2))))
-          (+evil--ex-buffer-match result hl-name nil (point-min) (point-max))))))
+(defun +evil-ex-global-delim-match (flag &optional arg)
+  (let ((hl-name 'evil-ex-global-delim-match)
+        (+evil--flag flag))
+    (with-selected-window (minibuffer-selected-window)
+      (+evil--ex-match-init hl-name)
+      (let ((result (car-safe (evil-delimited-arguments arg 2))))
+        (+evil--ex-buffer-match result hl-name nil (point-min) (point-max))))))
 
 (defun +evil/visual-indent ()
   (interactive)
@@ -1574,20 +1688,26 @@ Like vim but better.
         evil-ex-visual-char-range t             ; column range for ex commands
         evil-mode-line-format 'nil              ; don't have evil show modeline tag
         evil-symbol-word-search t               ; more vim-like behavior
-        shift-select-mode nil)                  ; don't activate mark on shift-click
+        shift-select-mode nil                   ; don't activate mark on shift-click
+        evil-default-cursor '+evil-default-cursor
+        evil-normal-state-cursor 'box
+        evil-emacs-state-cursor  '(box +evil-emacs-cursor)
+        evil-insert-state-cursor 'bar
+        evil-visual-state-cursor 'hollow)
 
   :config
+  (add-hook 'bmacs-post-init-hook #'evil-mode)
   ;; use evil-search for searching
   (evil-select-search-module 'evil-search-module 'evil-search)
 
-  ;; Set cursor colors later, once theme is loaded
-  (defun +evil*init-cursors (&rest _)
-    (setq evil-default-cursor (face-background 'cursor nil t)
-          evil-normal-state-cursor 'box
-          evil-emacs-state-cursor  `(,(face-foreground 'warning) box)
-          evil-insert-state-cursor 'bar
-          evil-visual-state-cursor 'hollow))
-  (advice-add #'load-theme :after #'+evil*init-cursors)
+  ;; Change the cursor color in emacs mode
+  (defvar +evil--default-cursor-color "#ffffff")
+  (defun +evil-default-cursor () (set-cursor-color +evil--default-cursor-color))
+  (defun +evil-emacs-cursor ()   (set-cursor-color (face-foreground 'warning)))
+
+  (defun +evil|update-cursor-color ()
+    (setq +evil--default-cursor-color (face-background 'cursor)))
+  (add-hook 'bmacs-load-theme-hook #'+evil|update-cursor-color)
 
   ;; default modes
   (dolist (mode '(tabulated-list-mode view-mode comint-mode term-mode calendar-mode Man-mode grep-mode))
@@ -1602,7 +1722,6 @@ Like vim but better.
       t))
   (add-hook 'bmacs-escape-hook #'+evil|disable-highlights)
 
-
   ;; make `try-expand-dabbrev' from `hippie-expand' work in minibuffer
   ;; @see `he-dabbrev-beg', so we need re-define syntax for '/'
   (defun minibuffer-inactive-mode-hook-setup ()
@@ -1612,6 +1731,21 @@ Like vim but better.
   (add-hook 'minibuffer-inactive-mode-hook #'minibuffer-inactive-mode-hook-setup)
 
   ;; --- evil hacks -------------------------
+  (defun +evil|save-buffer ()
+    "Shorter, vim-esque save messages."
+    (message "\"%s\" %dL, %dC written"
+             (if buffer-file-name
+                 (file-relative-name (file-truename buffer-file-name) (bmacs-project-root))
+               (buffer-name))
+             (count-lines (point-min) (point-max))
+             (buffer-size)))
+  (unless noninteractive
+    (setq save-silently t)
+    (add-hook 'after-save-hook #'+evil|save-buffer))
+
+  ;; Focus and recenter new splits
+  (advice-add #'evil-window-split  :override #'+evil*window-split)
+  (advice-add #'evil-window-vsplit :override #'+evil*window-vsplit)
 
   ;; Make ESC (from normal mode) the universal escaper. See `bmacs-escape-hook'.
   (advice-add #'evil-force-normal-state :after #'bmacs/escape)
@@ -1632,11 +1766,8 @@ across windows."
   ;; By default :g[lobal] doesn't highlight matches in the current buffer. I've
   ;; got to write my own argument type and interactive code to get it to do so.
   (evil-ex-define-argument-type global-delim-match :runner +evil-ex-global-delim-match)
-
   (dolist (sym '(evil-ex-global evil-ex-global-inverted))
-    (evil-set-command-property sym :ex-arg 'global-delim-match))
-
-  (evil-mode))
+    (evil-set-command-property sym :ex-arg 'global-delim-match)))
 #+END_SRC
 
 **** Operators
@@ -1746,6 +1877,36 @@ I like to prevent evil from yanking text to the clipboard in many scenarios.
                   (nth 3 evil-last-paste)
                   (nth 4 evil-last-paste)
                   t)))))
+
+(evil-define-command +evil*window-split (&optional count file)
+  "Same as `evil-window-split', but focuses (and recenters) the new split."
+  :repeat nil
+  (interactive "P<f>")
+  (split-window (selected-window) count
+                (if evil-split-window-below 'above 'below))
+  (call-interactively
+   (if evil-split-window-below
+       #'evil-window-up
+     #'evil-window-down))
+  (recenter)
+  (when (and (not count) evil-auto-balance-windows)
+    (balance-windows (window-parent)))
+  (if file (evil-edit file)))
+
+(evil-define-command +evil*window-vsplit (&optional count file)
+  "Same as `evil-window-vsplit', but focuses (and recenters) the new split."
+  :repeat nil
+  (interactive "P<f>")
+  (split-window (selected-window) count
+                (if evil-vsplit-window-right 'left 'right))
+  (call-interactively
+   (if evil-vsplit-window-right
+       #'evil-window-left
+     #'evil-window-right))
+  (recenter)
+  (when (and (not count) evil-auto-balance-windows)
+    (balance-windows (window-parent)))
+  (if file (evil-edit file)))
 #+END_SRC
 
 *** recentf
@@ -1762,14 +1923,14 @@ I like to prevent evil from yanking text to the clipboard in many scenarios.
 
 ** Completion
 
-*** Swiper
+*** swiper
 Awesome visual search utility
 
 #+BEGIN_SRC emacs-lisp
 (use-package swiper :commands (swiper swiper-all))
 #+END_SRC
 
-*** Counsel
+*** counsel
 Making everything all ivy-ed up.
 
 **** Functions
@@ -1797,21 +1958,45 @@ Making everything all ivy-ed up.
     (if (projectile-project-p)
       (counsel-projectile-rg-initial input)
       (counsel-rg input))))
+
+  (defun +ivy-recentf-transformer (str)
+    "Dim recentf entries that are not in the current project of the buffer you
+  started `counsel-recentf' from. Also uses `abbreviate-file-name'."
+    (let ((str (abbreviate-file-name str)))
+      (if (file-in-directory-p str (bmacs-project-root))
+          str
+        (propertize str 'face 'ivy-virtual))))
+
+(defun +ivy-projectile-find-file-transformer (str)
+  "Highlight entries that have been visited. This is the opposite of
+`counsel-projectile-find-file'."
+  (cond ((get-file-buffer (projectile-expand-root str))
+         (propertize str 'face '(:weight ultra-bold :slant italic)))
+        (t str)))
+
+;;   (defun +ivy-projectile-find-file-transformer (str)
+;;   "Highlight entries that have been visited. This is the opposite of
+;; `counsel-projectile-find-file'."
+;;     (cond ((get-file-buffer (projectile-expand-root str))
+;;            (propertize str 'face '(:weight ultra-bold :slant italic :foreground "#51afef")))
+;;           (t str)))
 #+END_SRC
 
 **** Config
 
 #+BEGIN_SRC emacs-lisp
 (use-package counsel-projectile
-  :demand t
+  :commands (counsel-projectile-find-file counsel-projectile-find-dir counsel-projectile-switch-to-buffer
+             counsel-projectile-grep counsel-projectile-ag counsel-projectile-switch-project)
   :after counsel
+  :init
+  (map! [remap projectile-find-file]        #'counsel-projectile-find-file
+        [remap projectile-find-dir]         #'counsel-projectile-find-dir
+        [remap projectile-switch-to-buffer] #'counsel-projectile-switch-to-buffer
+        [remap projectile-grep]             #'counsel-projectile-grep
+        [remap projectile-ag]               #'counsel-projectile-ag
+        [remap projectile-switch-project]   #'counsel-projectile-switch-project)
   :config
-  (defun +ivy-projectile-find-file-transformer (str)
-  "Highlight entries that have been visited. This is the opposite of
-`counsel-projectile-find-file'."
-    (cond ((get-file-buffer (projectile-expand-root str))
-           (propertize str 'face '(:weight ultra-bold :slant italic :foreground "#51afef")))
-          (t str)))
   (ivy-set-display-transformer #'counsel-projectile-find-file #'+ivy-projectile-find-file-transformer))
 
 (use-package counsel
@@ -1831,8 +2016,12 @@ Making everything all ivy-ed up.
         [remap org-capture]              #'counsel-org-capture
         [remap swiper]                   #'counsel-grep-or-swiper)
   :config
-  (require 'counsel-projectile)
-  (setq counsel-find-file-ignore-regexp "\\(?:^[#.]\\)\\|\\(?:[#~]$\\)\\|\\(?:^Icon?\\)")
+  (setq counsel-find-file-ignore-regexp "\\(?:^[#.]\\)\\|\\(?:[#~]$\\)\\|\\(?:^Icon?\\)"
+        ;; Add smart-casing and compressed archive searching (-zS) to default
+        ;; command arguments:
+        counsel-rg-base-command "rg -zS --no-heading --line-number --color never %s ."
+        counsel-ag-base-command "ag -zS --nocolor --nogroup %s"
+        counsel-pt-base-command "pt -zS --nocolor --nogroup -e %s")
 
   ;; Set evil jump point before search
   (advice-add #'counsel-ag-function :before (lambda (arg)
@@ -1843,14 +2032,6 @@ Making everything all ivy-ed up.
     (ivy-add-actions
      cmd
      '(("O" +ivy-git-grep-other-window-action "open in other window"))))
-
-  (defun +ivy-recentf-transformer (str)
-    "Dim recentf entries that are not in the current project of the buffer you
-  started `counsel-recentf' from. Also uses `abbreviate-file-name'."
-    (let ((str (abbreviate-file-name str)))
-      (if (file-in-directory-p str (bmacs-project-root))
-          str
-        (propertize str 'face 'ivy-virtual))))
 
   (ivy-set-display-transformer #'counsel-recentf #'+ivy-recentf-transformer))
 #+END_SRC
@@ -1872,25 +2053,31 @@ Improved M-x
 
 Provide more information in ivy buffers list.
 
+**** functions
+
+#+BEGIN_SRC emacs-lisp
+(defun +ivy-buffer-transformer (str)
+  "Dim special buffers, buffers whose file aren't in the current buffer, and
+virtual buffers. Uses `ivy-rich' under the hood."
+  (let ((buf (get-buffer str)))
+    (require 'ivy-rich)
+    (cond (buf (ivy-rich-switch-buffer-transformer str))
+          ((and (eq ivy-virtual-abbreviate 'full)
+                ivy-rich-switch-buffer-align-virtual-buffer)
+           (ivy-rich-switch-buffer-virtual-buffer str))
+          ((eq ivy-virtual-abbreviate 'full)
+           (propertize (abbreviate-file-name str) 'str 'ivy-virtual))
+          (t (propertize str 'face 'ivy-virtual)))))
+#+END_SRC
+
+**** config
+
 #+BEGIN_SRC emacs-lisp
 (use-package ivy-rich
   :demand t
   :after ivy
   :config
   (dolist (cmd '(ivy-switch-buffer counsel-projectile-switch-to-buffer))
-  (defun +ivy-buffer-transformer (str)
-    "Dim special buffers, buffers whose file aren't in the current buffer, and
-  virtual buffers. Uses `ivy-rich' under the hood."
-    (let ((buf (get-buffer str)))
-      (require 'ivy-rich)
-      (cond (buf (ivy-rich-switch-buffer-transformer str))
-            ((and (eq ivy-virtual-abbreviate 'full)
-                  ivy-rich-switch-buffer-align-virtual-buffer)
-             (ivy-rich-switch-buffer-virtual-buffer str))
-            ((eq ivy-virtual-abbreviate 'full)
-             (propertize (abbreviate-file-name str) 'str 'ivy-virtual))
-            (t (propertize str 'face 'ivy-virtual)))))
-
     (ivy-set-display-transformer cmd '+ivy-buffer-transformer)))
 #+END_SRC
 
@@ -1971,7 +2158,7 @@ Nice ivy hydra
 
 #+BEGIN_SRC emacs-lisp
 (use-package ivy-posframe
-  :hook (ivy-mode . ivy-posframe-enable)
+  :after ivy
   :preface
   ;; This function searches the entire `obarray' just to populate
   ;; `ivy-display-functions-props'. There are 15k entries in mine! This is
@@ -1999,7 +2186,9 @@ Nice ivy hydra
 
   ;; posframe doesn't work well with async sources
   (dolist (fn '(swiper counsel-rg counsel-ag counsel-pt counsel-grep counsel-git-grep))
-    (map-put ivy-display-functions-alist fn nil)))
+    (map-put ivy-display-functions-alist fn nil))
+
+  (ivy-posframe-enable))
 #+END_SRC
 
 *** company
@@ -2596,8 +2785,7 @@ Automatically detect and set indentation in programming modes
 (use-package magit
   :config
   (map! :map magit-mode-map
-        "SPC" nil)
-  (setq magit-completing-read-function #'ivy-completing-read))
+        "SPC" nil))
 #+END_SRC
 
 *** gitconfig-mode
@@ -2720,6 +2908,11 @@ repository root."
 
 ** UI
 
+*** general
+
+#+BEGIN_SRC emacs-lisp
+#+END_SRC
+
 *** all-the-icons
 Allows us to show pretty icons in Emacs.
 
@@ -2760,42 +2953,50 @@ Vi like tilde's in the fringe for past EOF
 #+BEGIN_SRC emacs-lisp
 (use-package doom-themes
   :demand t
+  :init
+  (unless doom-theme
+    (setq doom-theme 'doom-one))
   :config
-  ;(set! :theme 'doom-one)
-  (load-theme 'doom-one t)
+  (defun bmacs*load-theme-hooks (theme &rest _)
+    (setq doom-theme theme)
+    (run-hooks 'bmacs-load-theme-hook))
+  (advice-add #'load-theme :after #'bmacs*load-theme-hooks)
 
   ;; improve integration with org-mode
-  (add-hook 'bmacs-post-init-hook #'doom-themes-org-config)
+  (add-hook 'bmacs-load-theme-hook #'doom-themes-org-config)
 
   ;; blink mode-line on errors
-  (add-hook 'bmacs-post-init-hook #'doom-themes-visual-bell-config)
+  (add-hook 'bmacs-load-theme-hook #'doom-themes-visual-bell-config)
 
   ;; Add file icons to doom-neotree
-  (add-hook 'bmacs-post-init-hook #'doom-themes-neotree-config)
+  (add-hook 'bmacs-load-theme-hook #'doom-themes-neotree-config)
   (setq doom-neotree-enable-variable-pitch nil
         doom-neotree-file-icons 'simple
-        doom-neotree-line-spacing 2))
+        doom-neotree-line-spacing 2)
+
+  (when doom-theme
+    (load-theme doom-theme t)))
 
 (after! hideshow
-  (defface +doom-folded-face
-    `((((background dark))
-       (:inherit font-lock-comment-face :background ,(doom-color 'base0)))
-      (((background light))
-       (:inherit font-lock-comment-face :background ,(doom-color 'base3))))
+  (defface +doom-folded-face `((t (:inherit font-lock-comment-face :weight light)))
     "Face to hightlight `hideshow' overlays."
-    :group 'doom)
+    :group 'doom-themes)
 
   ;; Nicer code-folding overlays (with fringe indicators)
-  (setq hs-set-up-overlay
-        (lambda (ov)
-          (when (eq 'code (overlay-get ov 'hs))
-            (overlay-put
-             ov 'display (propertize "  [...]  " 'face '+doom-folded-face))))))
+  (defun +doom-set-up-overlay (ov)
+    (when (eq 'code (overlay-get ov 'hs))
+      (when (featurep 'vimish-fold)
+        (overlay-put
+         ov 'before-string
+         (propertize "…" 'display
+                     (list vimish-fold-indication-mode
+                           'empty-line
+                           'vimish-fold-fringe))))
+      (overlay-put
+       ov 'display (propertize "  [...]  " 'face '+doom-folded-face))))
+  (setq hs-set-up-overlay #'+doom-set-up-overlay))
 
-(unless (fboundp 'define-fringe-bitmap)
-  ;; doesn't exist in terminal Emacs; define it to prevent errors
-  (defun define-fringe-bitmap (&rest _)))
-
+;; NOTE Adjust these bitmaps if you change `doom-fringe-size'
 (after! flycheck
   ;; because git-gutter is in the left fringe
   (setq flycheck-indication-mode 'right-fringe)
@@ -2803,6 +3004,7 @@ Vi like tilde's in the fringe for past EOF
   (define-fringe-bitmap 'flycheck-fringe-bitmap-double-arrow
     [16 48 112 240 112 48 16] nil nil 'center))
 
+;; subtle diff indicators in the fringe
 (after! git-gutter-fringe
   ;; places the git gutter outside the margins.
   (setq-default fringes-outside-margins t)
@@ -2813,6 +3015,9 @@ Vi like tilde's in the fringe for past EOF
     nil nil '(center repeated))
   (define-fringe-bitmap 'git-gutter-fr:deleted [128 192 224 240]
     nil nil 'bottom))
+
+;; standardize default fringe width
+(if (fboundp 'fringe-mode) (fringe-mode '4))
 #+END_SRC
 
 *** doom-dashboard
@@ -4421,7 +4626,6 @@ FUN function callback"
 ;; Custom variables
 (defvar +borg-dir (expand-file-name "~/org/")
   "The directory where org files are kept.")
-(defvaralias 'org-directory '+borg-dir)
 
 (defvar +borg-organizer (concat +borg-dir "organizer.org")
   "The default organizer.")
@@ -4467,6 +4671,8 @@ FUN function callback"
     :keymap (make-sparse-keymap)
     :group 'evil-org)
 
+
+  (defvaralias 'org-directory '+borg-dir)
   (+borg-init-ui)
   (+borg-hacks))
 
@@ -6115,7 +6321,7 @@ Gross
   (add-hook 'tide-mode-hook (lambda ()
                                 (setq-local company-backends '(company-tide))))
 
-  ;; resolve to `doom-project-root' if `tide-project-root' fails
+  ;; resolve to `bmacs-project-root' if `tide-project-root' fails
   (advice-add #'tide-project-root :override #'+javascript*tide-project-root)
 
   ;; cleanup tsserver when no tide buffers are left
