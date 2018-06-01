@@ -3208,17 +3208,20 @@ A super cool dashboard on startup!
                    "\n\n"))))
             `(("Homepage" "mark-github"
                (browse-url "https://github.com/gilbertw1/bmacs"))
-              ,(when (and (file-exists-p (expand-file-name persp-auto-save-fname persp-save-dir)))
-                 '("Reload last session" "history"
-                   (+workspace/load-session)))
+              ,(when (fboundp 'org-agenda-list)
+               '("See agenda for this week" "calendar"
+                 (call-interactively #'org-agenda-list)))
               ("Recently opened files" "file-text"
-               (call-interactively (command-remapping 'recentf-open-files)))
+               (call-interactively (or (command-remapping #'recentf-open-files)
+                                     #'recentf-open-files)))
               ("Open project" "briefcase"
-               (call-interactively (command-remapping 'projectile-switch-project)))
+               (call-interactively (or (command-remapping #'projectile-switch-project)
+                                     #'projectile-switch-project)))
               ("Jump to bookmark" "bookmark"
-               (call-interactively (command-remapping 'bookmark-jump)))
-              ("Edit emacs.d" "tools"
-               (find-file (expand-file-name "init.el" bmacs-emacs-dir)))))))
+               (call-interactively (or (command-remapping #'bookmark-jump)
+                                     #'bookmark-jump)))
+              ("Edit bmacs.org" "tools"
+               (find-file (expand-file-name "bmacs.org" bmacs-emacs-dir)))))))
 
   (defun +doom-dashboard/next-button ()
     (interactive)
