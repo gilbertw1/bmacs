@@ -4,3 +4,5 @@
 (byte-compile-file "bmacs.el")
 (byte-compile-file "early-init.el")
 (byte-compile-file "init.el")
+(byte-compile-file "custom/dash-docs.el")
+(byte-compile-file "custom/counsel-dash.el")
