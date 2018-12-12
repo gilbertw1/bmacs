@@ -2,8 +2,7 @@
 #+AUTHOR: Bryan Gilbert
 #+PROPERTY: header-args :tangle yes
 
-* Configuration
-:PROPERTIES:
+* Configuration :PROPERTIES:
 :VISIBILITY: children
 :END:
 
@@ -197,7 +196,7 @@ This is Bryan Gilbert's personal Emacs configuration.
 *** Font
 
 #+BEGIN_SRC emacs-lisp
-(defvar bmacs-font (font-spec :family "Iosevka" :size 25))
+(defvar bmacs-font (font-spec :family "Iosevka" :size 24))
 #+END_SRC
 
 *** Theme
@@ -1569,6 +1568,145 @@ Auto-close delimiters and blocks as you type.
 *** Ivy
 They power and the glory! Generic complete anything frontend
 
+**** Functions
+
+#+BEGIN_SRC emacs-lisp
+(defun +ivy/wgrep-occur ()
+  "Invoke the search+replace wgrep buffer on the current ag/rg search results."
+  (interactive)
+  (unless (window-minibuffer-p)
+    (user-error "No completion session is active"))
+  (require 'wgrep)
+  (let* ((caller (ivy-state-caller ivy-last))
+         (occur-fn (plist-get ivy--occurs-list caller))
+         (buffer
+          (generate-new-buffer
+           (format "*ivy-occur%s \"%s\"*"
+                   (if caller (concat " " (prin1-to-string caller)) "")
+                   ivy-text))))
+    (with-current-buffer buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (funcall occur-fn))
+      (setf (ivy-state-text ivy-last) ivy-text)
+      (setq ivy-occur-last ivy-last)
+      (setq-local ivy--directory ivy--directory))
+    (ivy-exit-with-action
+     `(lambda (_)
+        (pop-to-buffer ,buffer)
+        (ivy-wgrep-change-to-wgrep-mode)))))
+
+(defun +ivy--tasks-candidates (tasks)
+  "Generate a list of task tags (specified by `+ivy-task-tags') for
+`+ivy/tasks'."
+  (let* ((max-type-width
+          (cl-loop for task in +ivy-task-tags maximize (length (car task))))
+         (max-desc-width
+          (cl-loop for task in tasks maximize (length (cl-cdadr task))))
+         (max-width (max (- (frame-width) (1+ max-type-width) max-desc-width)
+                         25)))
+    (cl-loop
+     with fmt = (format "%%-%ds %%-%ds%%s%%s:%%s" max-type-width max-width)
+     for alist in tasks
+     collect
+     (let-alist alist
+       (format fmt
+               (propertize .type 'face (cdr (assoc .type +ivy-task-tags)))
+               (substring .desc 0 (min max-desc-width (length .desc)))
+               (propertize " | " 'face 'font-lock-comment-face)
+               (propertize (abbreviate-file-name .file) 'face 'font-lock-keyword-face)
+               (propertize .line 'face 'font-lock-constant-face))))))
+
+(defun +ivy--tasks (target)
+  (let* (case-fold-search
+         (task-tags (mapcar #'car +ivy-task-tags))
+         (cmd
+          (format "%s -H -S --no-heading -- %s %s"
+                  (or (when-let* ((bin (executable-find "rg")))
+                        (concat bin " --line-number"))
+                      (when-let* ((bin (executable-find "ag")))
+                        (concat bin " --numbers"))
+                      (error "ripgrep & the_silver_searcher are unavailable"))
+                  (shell-quote-argument
+                   (concat "\\s("
+                           (string-join task-tags "|")
+                           ")([\\s:]|\\([^)]+\\):?)"))
+                  target)))
+    (save-match-data
+      (cl-loop with out = (shell-command-to-string cmd)
+               for x in (and out (split-string out "\n" t))
+               when (condition-case-unless-debug ex
+                      (string-match
+                       (concat "^\\([^:]+\\):\\([0-9]+\\):.+\\("
+                               (string-join task-tags "\\|")
+                               "\\):?\\s-*\\(.+\\)")
+                       x)
+                      (error
+                       (print! (red "Error matching task in file: (%s) %s"
+                                    (error-message-string ex)
+                                    (car (split-string x ":"))))
+                       nil))
+               collect `((type . ,(match-string 3 x))
+                         (desc . ,(match-string 4 x))
+                         (file . ,(match-string 1 x))
+                         (line . ,(match-string 2 x)))))))
+
+(defun +ivy--tasks-open-action (x)
+  "Jump to the file and line of the current task."
+  (let ((location (cadr (split-string x " | ")))
+        (type (car (split-string x " "))))
+    (cl-destructuring-bind (file line) (split-string location ":")
+      (with-ivy-window
+        (find-file (expand-file-name file (doom-project-root)))
+        (goto-char (point-min))
+        (forward-line (1- (string-to-number line)))
+        (search-forward type (line-end-position) t)
+        (backward-char (length type))
+        (recenter)))))
+
+(defun +ivy/tasks (&optional arg)
+  "Search through all TODO/FIXME tags in the current project. If ARG, only
+search current file. See `+ivy-task-tags' to customize what this searches for."
+  (interactive "P")
+  (ivy-read (format "Tasks (%s): "
+                    (if arg
+                        (concat "in: " (file-relative-name buffer-file-name))
+                      "project"))
+            (+ivy--tasks-candidates
+             (+ivy--tasks (if arg buffer-file-name (doom-project-root))))
+            :action #'+ivy--tasks-open-action
+            :caller '+ivy/tasks))
+
+(defun +ivy-git-grep-other-window-action (x)
+  "Opens the current candidate in another window."
+  (when (string-match "\\`\\(.*?\\):\\([0-9]+\\):\\(.*\\)\\'" x)
+    (select-window
+     (with-ivy-window
+       (let ((file-name   (match-string-no-properties 1 x))
+             (line-number (match-string-no-properties 2 x)))
+         (find-file-other-window (expand-file-name file-name (ivy-state-directory ivy-last)))
+         (goto-char (point-min))
+         (forward-line (1- (string-to-number line-number)))
+         (re-search-forward (ivy--regex ivy-text t) (line-end-position) t)
+         (run-hooks 'counsel-grep-post-action-hook)
+         (selected-window))))))
+
+(defun +ivy-buffer-transformer (str)
+  "Dim special buffers, buffers whose file aren't in the current buffer, and
+virtual buffers. Uses `ivy-rich' under the hood."
+  (let ((buf (get-buffer str)))
+    (require 'ivy-rich)
+    (cond (buf (ivy-rich-switch-buffer-transformer str))
+          ((and (eq ivy-virtual-abbreviate 'full)
+                ivy-rich-switch-buffer-align-virtual-buffer)
+           (ivy-rich-switch-buffer-virtual-buffer str))
+          ((eq ivy-virtual-abbreviate 'full)
+           (propertize (abbreviate-file-name str) 'str 'ivy-virtual))
+          (t (propertize str 'face 'ivy-virtual)))))
+#+END_SRC
+
+**** Config
+
 #+BEGIN_SRC emacs-lisp
 (use-package ivy
   :after-call pre-command-hook
@@ -1589,6 +1727,11 @@ They power and the glory! Generic complete anything frontend
   (map! [remap switch-to-buffer]       #'ivy-switch-buffer
         [remap persp-switch-to-buffer] #'counsel-projectile-switch-to-buffer
         [remap imenu-anywhere]         #'ivy-imenu-anywhere)
+
+  ;; (after! ivy-rich
+  ;;   (dolist (cmd '(ivy-switch-buffer +ivy/switch-workspace-buffer
+  ;;                  counsel-projectile-switch-to-buffer))
+  ;;     (ivy-set-display-transformer cmd '+ivy-buffer-transformer)))
 
   (after! magit     (setq magit-completing-read-function #'ivy-completing-read))
   (after! yasnippet (add-to-list 'yas-prompt-functions #'+ivy-yas-prompt nil #'eq))
@@ -2072,6 +2215,18 @@ virtual buffers. Uses `ivy-rich' under the hood."
           ((eq ivy-virtual-abbreviate 'full)
            (propertize (abbreviate-file-name str) 'str 'ivy-virtual))
           (t (propertize str 'face 'ivy-virtual)))))
+
+(defun +ivy*rich-switch-buffer-buffer-name (str)
+  (propertize
+   (ivy-rich-pad str ivy-rich-switch-buffer-name-max-length)
+   'face (cond ((string-match-p "^ *\\*" str)
+                'font-lock-comment-face)
+               ((and buffer-file-truename
+                     (not (file-in-directory-p buffer-file-truename (bmacs-project-root))))
+                'font-lock-doc-face)
+               (t nil))))
+(advice-add 'ivy-rich-switch-buffer-buffer-name :override #'+ivy*rich-switch-buffer-buffer-name)
+
 #+END_SRC
 
 **** config
@@ -2079,10 +2234,7 @@ virtual buffers. Uses `ivy-rich' under the hood."
 #+BEGIN_SRC emacs-lisp
 (use-package ivy-rich
   :demand t
-  :after ivy
-  :config
-  (dolist (cmd '(ivy-switch-buffer counsel-projectile-switch-to-buffer))
-    (ivy-set-display-transformer cmd '+ivy-buffer-transformer)))
+  :after ivy)
 #+END_SRC
 
 *** ivy-hydra
@@ -2141,7 +2293,7 @@ Nice ivy hydra
       ("o" ivy-occur :exit t)))
 #+END_SRC
 
-*** ivy-posframe (disabled)   
+*** ivy-posframe (disabled)
 
 **** functions
 
@@ -2213,7 +2365,7 @@ Generic code auto completion
         company-require-match 'never
         company-global-modes '(not eshell-mode comint-mode erc-mode message-mode help-mode gud-mode)
         company-frontends '(company-pseudo-tooltip-frontend company-echo-metadata-frontend)
-        company-backends '(company-capf company-dabbrev-code company-keywords company-files company-dabbrev)
+        company-backends '(company-dabbrev-code company-capf company-keywords company-files company-dabbrev)
         company-transformers '(company-sort-by-occurrence))
 
   (after! yasnippet
@@ -4377,6 +4529,18 @@ Easily select windows for various actions.
 *** avy
 Quickly jump to things
 
+**** Functions
+
+#+BEGIN_SRC emacs-lisp
+(defun bmacs/evil-avy-goto-char-2-after-insert ()
+  (interactive)
+  (evil-avy-goto-char-2)
+  (goto-char (+ (point) 2))
+  (evil-insert-state))
+#+END_SRC
+
+**** Config
+
 #+BEGIN_SRC emacs-lisp
 (use-package avy
   :commands (avy-goto-char-2 avy-goto-line avy-go-word-or-subword-1 avy-goto-char-timer)
@@ -5306,15 +5470,15 @@ Configuration
     (unless target
       (setq target (mu4e~mark-ask-target mark)))
     (if (not (use-region-p))
-      ;; single message
-      (mu4e-mark-at-point mark target)
+        ;; single message
+        (mu4e-mark-at-point mark target)
       ;; mark all messages in the region.
       (save-excursion
         (let ((cant-go-further) (eor (region-end)))
-	  (goto-char (region-beginning))
-	  (while (and (< (point) eor) (not cant-go-further))
-	    (mu4e-mark-at-point mark target)
-	    (setq cant-go-further (not (mu4e-headers-next)))))))))
+	        (goto-char (region-beginning))
+	        (while (and (< (point) eor) (not cant-go-further))
+	          (mu4e-mark-at-point mark target)
+	          (setq cant-go-further (not (mu4e-headers-next)))))))))
 #+END_SRC
 
 ** Tools
@@ -5761,52 +5925,6 @@ The language of the machine!
 Can you hear the C? -- TODO: Pair this down to just basic C/C++ support ... too complex
 
 #+BEGIN_SRC emacs-lisp
-  (defun +cc*align-lambda-arglist (orig-fun &rest args)
-    "Improve indentation of continued C++11 lambda function opened as argument."
-    (if (and (eq major-mode 'c++-mode)
-             (ignore-errors
-               (save-excursion
-                 (goto-char (c-langelem-pos langelem))
-                 ;; Detect "[...](" or "[...]{". preceded by "," or "(",
-                 ;;   and with unclosed brace.
-                 (looking-at-p ".*[(,][ \t]*\\[[^]]*\\][ \t]*[({][^}]*$"))))
-        0 ; no additional indent
-      (apply orig-fun args)))
-
-  (defun +cc/autoclose->-maybe ()
-    "For some reason smartparens won't autoskip >'s, this hack does."
-    (interactive)
-    (if (save-excursion
-          (backward-char)
-          (looking-at-p "[^ \t]>"))
-        (forward-char)
-      (call-interactively #'self-insert-command)))
-
-  (defun +cc-sp-point-is-template-p (id action context)
-    "Return t if point is in the right place for C++ angle-brackets."
-    (and (sp-in-code-p id action context)
-         (sp-point-after-word-p id action context)))
-
-  (defun +cc-sp-point-after-include-p (id action context)
-    "Return t if point is in an #include."
-    (and (sp-in-code-p id action context)
-         (save-excursion
-           (goto-char (line-beginning-position))
-           (looking-at-p "[ 	]*#include[^<]+"))))
-
-  (defun +cc-c-lineup-inclass (_langelem)
-    "Indent privacy keywords at same level as class properties."
-    (if (memq major-mode '(c-mode c++-mode))
-        (let ((inclass (assq 'inclass c-syntactic-context)))
-          (save-excursion
-            (goto-char (c-langelem-pos inclass))
-            (if (or (looking-at "struct")
-                    (looking-at "typedef struct"))
-                '+
-              '++)))
-      '+))
-
-
   ;;
   ;; Hooks
   ;;
@@ -5821,76 +5939,18 @@ Can you hear the C? -- TODO: Pair this down to just basic C/C++ support ... too 
   (use-package cc-mode
     :commands (c-mode c++-mode objc-mode java-mode)
     :mode ("\\.mm" . objc-mode)
-    :preface
-    (defun +cc-c++-header-file-p ()
-      (and buffer-file-name
-           (equal (file-name-extension buffer-file-name) "h")
-           (or (file-exists-p (expand-file-name
-                               (concat (file-name-sans-extension buffer-file-name)
-                                       ".cpp")))
-               (when-let* ((file (car-safe (projectile-get-other-files
-                                           buffer-file-name
-                                           (projectile-current-project-files)))))
-                 (equal (file-name-extension file) "cpp")))))
-
-    (defun +cc-objc-header-file-p ()
-      (and buffer-file-name
-           (equal (file-name-extension buffer-file-name) "h")
-           (re-search-forward "@\\<interface\\>" magic-mode-regexp-match-limit t)))
-
-    (push (cons #'+cc-c++-header-file-p  'c++-mode)  magic-mode-alist)
-    (push (cons #'+cc-objc-header-file-p 'objc-mode) magic-mode-alist)
-
     :init
-    (setq-default c-basic-offset tab-width)
+    (setq-default c-basic-offset tab-width
+                  c-default-style "linux")
 
     :config
-    ;(set! :electric '(c-mode c++-mode objc-mode java-mode)
-    ;      :chars '(?\n ?\}))
-    ;(set! :company-backend
-    ;      '(c-mode c++-mode objc-mode)
-    ;      '(company-irony-c-headers company-irony))
-
-    ;;; Style/formatting
-    ;; C/C++ style settings
-    (c-toggle-electric-state -1)
-    (c-toggle-auto-newline -1)
-    (c-set-offset 'substatement-open '0) ; don't indent brackets
-    (c-set-offset 'inline-open       '+)
-    (c-set-offset 'block-open        '+)
-    (c-set-offset 'brace-list-open   '+)
-    (c-set-offset 'case-label        '+)
-    (c-set-offset 'access-label      '-)
-    (c-set-offset 'arglist-intro     '+)
-    (c-set-offset 'arglist-close     '0)
-    ;; Indent privacy keywords at same level as class properties
-    ;; (c-set-offset 'inclass #'+cc-c-lineup-inclass)
-
     ;;; Better fontification (also see `modern-cpp-font-lock')
     (add-hook 'c-mode-common-hook #'rainbow-delimiters-mode)
     (add-hook! (c-mode c++-mode) #'highlight-numbers-mode)
     (add-hook! (c-mode c++-mode) #'+cc|fontify-constants)
 
-    ;; Improve indentation of inline lambdas in C++11
-    (advice-add #'c-lineup-arglist :around #'+cc*align-lambda-arglist)
-
-    ;;; Keybindings
-    ;; Completely disable electric keys because it interferes with smartparens and
-    ;; custom bindings. We'll do this ourselves.
-    (setq c-tab-always-indent nil
-          c-electric-flag nil)
-    (dolist (key '("#" "{" "}" "/" "*" ";" "," ":" "(" ")"))
-      (define-key c-mode-base-map key nil))
-    ;; Smartparens and cc-mode both try to autoclose angle-brackets intelligently.
-    ;; The result isn't very intelligent (causes redundant characters), so just do
-    ;; it ourselves.
-    (map! :map c++-mode-map
-          "<" nil
-          :i ">" #'+cc/autoclose->-maybe)
-
     ;; ...and leave it to smartparens
     (sp-with-modes '(c-mode c++-mode objc-mode java-mode)
-      (sp-local-pair "<" ">" :when '(+cc-sp-point-is-template-p +cc-sp-point-after-include-p))
       (sp-local-pair "/*" "*/" :post-handlers '(("||\n[i]" "RET") ("| " "SPC")))
       ;; Doxygen blocks
       (sp-local-pair "/**" "*/" :post-handlers '(("||\n[i]" "RET") ("||\n[i]" "SPC")))
@@ -5900,39 +5960,6 @@ Can you hear the C? -- TODO: Pair this down to just basic C/C++ support ... too 
   (use-package modern-cpp-font-lock
     :commands modern-c++-font-lock-mode
     :init (add-hook 'c++-mode-hook #'modern-c++-font-lock-mode))
-
-
-  (use-package irony
-    :demand t
-    :after cc-mode
-    :commands irony-install-server
-    :preface
-    (setq irony-server-install-prefix (concat bmacs-etc-dir "irony-server/"))
-    :init
-    (add-hook! (c-mode c++-mode objc-mode) #'irony-mode)
-    :config
-    (unless (file-directory-p irony-server-install-prefix)
-      (warn "irony-mode: server isn't installed; run M-x irony-install-server")))
-
-  (use-package irony-eldoc
-    :demand t
-    :after irony
-    :config (add-hook 'irony-mode-hook #'irony-eldoc))
-
-  (use-package flycheck-irony
-    :demand t
-    :after irony
-    :config
-    (add-hook 'irony-mode-hook #'flycheck-mode)
-    (flycheck-irony-setup))
-
-
-  ;;
-  ;; Tools
-  ;;
-
-  (use-package disaster :commands disaster)
-
 
   ;;
   ;; Major modes
@@ -5956,27 +5983,6 @@ Can you hear the C? -- TODO: Pair this down to just basic C/C++ support ... too 
     :mode "\\.vert$"
     :mode "\\.frag$"
     :mode "\\.geom$")
-
-
-  ;;
-  ;; Plugins
-  ;;
-
-  (use-package company-irony
-    :demand t
-    :after irony)
-
-  (use-package company-irony-c-headers
-    :demand t
-    :after company-irony)
-
-  (use-package company-glsl
-    :demand t
-    :after glsl-mode)
-    ;; :config
-    ;; (if (executable-find "glslangValidator")
-    ;;     (warn "glsl-mode: couldn't find glslangValidator, disabling company-glsl")
-    ;;   (set! :company-backend 'glsl-mode '(company-glsl))))
 #+END_SRC
 
 *** Clojure
@@ -6266,39 +6272,39 @@ Lazy lazy functional programming
 
   (autoload 'switch-to-haskell "inf-haskell" nil t))
 
-(use-package ghc
-  :commands (ghc-init ghc-debug))
+;; (use-package ghc
+;;   :commands (ghc-init ghc-debug))
 
-(use-package company-ghc
-  :commands (company-ghc))
+;; (use-package company-ghc
+;;   :commands (company-ghc))
 
 (use-package shm
   :commands (structured-haskell-mode))
 
-(use-package dante
-  :demand t
-  :after haskell-mode
-  :init
-  (add-hook 'haskell-mode-hook #'(dante-mode interactive-haskell-mode))
-  :config
-  (unless (executable-find "cabal")
-    (warn "haskell-mode: couldn't find cabal")
-    (remove-hook 'haskell-mode-hook #'dante-mode))
+;; (use-package dante
+;;   :demand t
+;;   :after haskell-mode
+;;   :init
+;;   (add-hook 'haskell-mode-hook #'(dante-mode interactive-haskell-mode))
+;;   :config
+;;   (unless (executable-find "cabal")
+;;     (warn "haskell-mode: couldn't find cabal")
+;;     (remove-hook 'haskell-mode-hook #'dante-mode))
 
-  (add-hook 'dante-mode-hook #'flycheck-mode))
+;;   (add-hook 'dante-mode-hook #'flycheck-mode))
 
-(use-package company-ghc
-  :demand t
-  :after haskell-mode
-  :init
-  (add-hook 'haskell-mode-hook #'ghc-comp-init)
-  :config
-  (if (executable-find "ghc-mod")
-      (add-hook! haskell-mode (setq-local company-backends '(company-ghc)))
-    (warn "haskell-mode: couldn't find ghc-mode")
-    (remove-hook 'haskell-mode-hook #'ghc-comp-init))
+;; (use-package company-ghc
+;;   :demand t
+;;   :after haskell-mode
+;;   :init
+;;   (add-hook 'haskell-mode-hook #'ghc-comp-init)
+;;   :config
+;;   (if (executable-find "ghc-mod")
+;;       (add-hook! haskell-mode (setq-local company-backends '(company-ghc)))
+;;     (warn "haskell-mode: couldn't find ghc-mode")
+;;     (remove-hook 'haskell-mode-hook #'ghc-comp-init))
 
-  (setq company-ghc-show-info 'oneline))
+;;   (setq company-ghc-show-info 'oneline))
 #+END_SRC
 
 *** Hy
@@ -7044,24 +7050,24 @@ Ghetto shell scripting
   (setq sh-indent-after-continuation 'always)
 
   ;; recognize function names with dashes in them
-  (push '((sh . ((nil "^\\s-*function\\s-+\\([[:alpha:]_-][[:alnum:]_-]*\\)\\s-*\\(?:()\\)?" 1)
-                 (nil "^\\s-*\\([[:alpha:]_-][[:alnum:]_-]*\\)\\s-*()" 1))))
-        sh-imenu-generic-expression)
+   (push '((sh . ((nil "^\\s-*function\\s-+\\([[:alpha:]_-][[:alnum:]_-]*\\)\\s-*\\(?:()\\)?" 1)
+                  (nil "^\\s-*\\([[:alpha:]_-][[:alnum:]_-]*\\)\\s-*()" 1))))
+         sh-imenu-generic-expression)
 
   ;; 1. Fontifies variables in double quotes
   ;; 2. Fontify command substitution in double quotes
   ;; 3. Fontify built-in/common commands (see `+sh-builtin-keywords')
-  (font-lock-add-keywords
-   'sh-mode `((+sh--match-variables-in-quotes
-               (1 'font-lock-constant-face prepend)
-               (2 'font-lock-variable-name-face prepend))
-              (+sh--match-command-subst-in-quotes
-               (1 'sh-quoted-exec prepend))
-              (,(regexp-opt +sh-builtin-keywords 'words)
-               (0 'font-lock-type-face append))))
+   (font-lock-add-keywords
+    'sh-mode `((+sh--match-variables-in-quotes
+                (1 'font-lock-constant-face prepend)
+                (2 'font-lock-variable-name-face prepend))
+               (+sh--match-command-subst-in-quotes
+                (1 'sh-quoted-exec prepend))
+               (,(regexp-opt +sh-builtin-keywords 'words)
+                (0 'font-lock-type-face append))))
 
   ;; autoclose backticks
-  (sp-local-pair 'sh-mode "`" nil :unless '(sp-point-before-word-p sp-point-before-same-p))
+  ;;(sp-local-pair 'sh-mode "`" nil :unless '(sp-point-before-word-p sp-point-before-same-p))
 
   ;; sh-mode has file extensions checks for other shells, but not zsh, so...
   (defun +sh|detect-zsh ()
@@ -8132,6 +8138,7 @@ session)."
  :n  "gc" #'evil-commentary
  ;; avy goto char
  :n "s"   #'avy-goto-char-2
+ :n "S"   #'bmacs/evil-avy-goto-char-2-after-insert
  ;; evil-surround
  :v  "s"  #'evil-surround-region
  :o  "s"  #'evil-surround-edit
@@ -8513,6 +8520,16 @@ session)."
      :m "b" #'realgud:cmd-break
      :m "B" #'realgud:cmd-clear
      :n "c" #'realgud:cmd-continue))
+
+ ;; sbt
+ (:after sbt
+   (:map sbt-mode-map
+     :nv "C-d" #'evil-scroll-down))
+
+ ;; comint
+ (:after comint
+   (:map comint-mode-map
+     :nv "C-d" #'evil-scroll-down))
 
  ;; yasnippet
  (:after yasnippet
